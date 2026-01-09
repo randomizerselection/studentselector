@@ -1,6 +1,4 @@
-# studentselector
-
-Random Student Selector
+# Random Student Selector
 
 ## What this app does
 
