@@ -464,7 +464,7 @@ class InvisibleHandApp:
         # Main action
         ttk.Button(
             content,
-            text="START RANDOM PICK • 随机抽选",
+            text="START RANDOM PICK",
             bootstyle="success",
             command=self._start_session
         ).pack(fill="x", padx=10, ipady=18, pady=(0, 16))
@@ -654,7 +654,7 @@ class InvisibleHandApp:
 
         status_label = ttk.Label(
             main,
-            text="Now Choosing 现在抽选",
+            text="Now Choosing",
             font=self.f(header_px, "bold"),
             bootstyle="primary",
             anchor="center",
@@ -858,7 +858,7 @@ class InvisibleHandApp:
             reel.itemconfig(t_prev, state="hidden")
             reel.itemconfig(t_next, state="hidden")
 
-            status_label.config(text="Selected 选中", bootstyle="success")
+            status_label.config(text="Selected", bootstyle="success")
             try:
                 progress.grid_remove()
             except Exception:
@@ -943,7 +943,7 @@ class InvisibleHandApp:
 
         prompt = ttk.Label(
             button_frame,
-            text="Rate the response • 评价",
+            text="Rate the response",
             font=self.f(prompt_px, "bold"),
             bootstyle="secondary",
             anchor="center",
@@ -1018,7 +1018,7 @@ class InvisibleHandApp:
 
         header = ttk.Label(
             outer,
-            text="Feedback • 反馈",
+            text="Feedback",
             font=self.f(header_px, "bold"),
             bootstyle="primary",
             anchor="center",
@@ -1050,14 +1050,14 @@ class InvisibleHandApp:
 
         ttk.Button(
             btns,
-            text="Next Student • 下一个",
+            text="Next Student",
             bootstyle="success",
             command=next_student
         ).grid(row=0, column=0, sticky="ew", padx=(0, self.fs(12)), ipady=self.fs(16))
 
         ttk.Button(
             btns,
-            text="Exit • 返回选班",
+            text="Exit",
             bootstyle="secondary",
             command=exit_to_main
         ).grid(row=0, column=1, sticky="ew", padx=(self.fs(12), 0), ipady=self.fs(16))
