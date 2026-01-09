@@ -6,6 +6,17 @@ This app helps a teacher pick students at random from a class list. You choose a
 
 In short: it is a classroom-friendly way to call on students fairly and keep simple participation notes.
 
+## How to use it
+
+1) Open the app.
+2) Pick a class from the dropdown.
+3) Set a timer (minutes and seconds).
+4) Click Start Random Pick.
+5) When a student is selected, choose a rating (A*, A, B, or C).
+6) Read the feedback message, then choose Next Student or Exit.
+
+Tip: Press Esc to close the slot or feedback windows.
+
 ## CSV files you need
 
 The app reads two CSV files from the `assets` folder. You can edit them in Excel, Google Sheets, or any text editor and save as CSV.
@@ -21,6 +32,7 @@ IC 1.1,Anna Chen
 IC 1.1,张伟
 IC 1.2,Jordan Lee
 ```
+Privacy note: this file is ignored by Git, so each user keeps their own local list.
 
 2) `assets/messages.csv`
 - Purpose: feedback messages shown after you give a rating.
@@ -29,8 +41,18 @@ IC 1.2,Jordan Lee
 - Example:
 ```csv
 Rating,Message
-A*,Outstanding work today!
-A,Great job, keep it up.
-B,Good effort, aim a little higher.
-C,Let's focus and try again next time.
+A*,"Outstanding work today!"
+A,"Great job, keep it up."
+B,"Good effort, aim a little higher."
+C,"Let's focus and try again next time."
 ```
+
+## What happens during a pick
+
+- The app cycles through names for the amount of time you set, then lands on a final student.
+- The selected student is removed from that class list for the rest of the session.
+- At the end, you can view a simple Grades Summary of who received which rating.
+
+## Sounds (optional)
+
+The app plays short sounds and music during selection and after rating. If audio files are missing, the app still runs. You can toggle sound on/off from the main screen.
