@@ -33,7 +33,8 @@ TOP_RIGHT_PADDING_X = 20
 TOP_PADDING_Y = 0
 
 SLOT_PANEL_W = 780
-SLOT_PANEL_H = 620
+SLOT_PANEL_H = 580
+SLOT_PANEL_MIN_H = 520
 SLOT_PANEL_MARGIN_RIGHT = 20
 SLOT_PANEL_Y = 80
 
@@ -334,8 +335,13 @@ class InvisibleHandApp:
         y = TOP_PADDING_Y
         self.root.geometry(f"{WINDOW_WIDTH}x{window_h}+{x}+{y}")
 
+    def _slot_window_height(self) -> int:
+        screen_h = self.root.winfo_screenheight()
+        return min(SLOT_PANEL_H, max(SLOT_PANEL_MIN_H, screen_h - 140))
+
     def _slot_window_geometry(self, parent_w: int) -> str:
         screen_w = self.root.winfo_screenwidth()
+        window_h = self._slot_window_height()
 
         x = screen_w - SLOT_PANEL_W - SLOT_PANEL_MARGIN_RIGHT
         y = SLOT_PANEL_Y
@@ -344,7 +350,7 @@ class InvisibleHandApp:
         if x < control_left + WINDOW_WIDTH:
             x = max(0, control_left - SLOT_PANEL_W - 15)
 
-        return f"{SLOT_PANEL_W}x{SLOT_PANEL_H}+{x}+{y}"
+        return f"{SLOT_PANEL_W}x{window_h}+{x}+{y}"
 
     def _clear_root(self):
         for w in self.root.winfo_children():
@@ -562,8 +568,10 @@ class InvisibleHandApp:
         win = ttk.Toplevel(self.root)
         win.title("Lucky Student")
         win.attributes("-topmost", True)
+        window_h = self._slot_window_height()
+        compact = window_h < 620
         win.geometry(self._slot_window_geometry(parent_w=WINDOW_WIDTH))
-        win.minsize(760, 560)
+        win.minsize(760, window_h)
 
         # --- theme-safe colors ---
         colors = getattr(self.style, "colors", None)
@@ -616,40 +624,54 @@ class InvisibleHandApp:
         win.bind("<Escape>", on_escape)
         win.protocol("WM_DELETE_WINDOW", on_close)
 
+        main = ttk.Frame(win)
+        main.pack(fill="both", expand=True)
+        main.columnconfigure(0, weight=1)
+        main.rowconfigure(2, weight=1)
+
         # --- Header ---
-        header = ttk.Frame(win, padding=(18, 16))
-        header.pack(fill="x")
+        header_pad_y = 8 if compact else 12
+        header_px = 24 if compact else 26
+        status_px = 38 if compact else 46
+
+        header = ttk.Frame(main, padding=(18, header_pad_y))
+        header.grid(row=0, column=0, sticky="ew")
 
         ttk.Label(
             header,
             text=f"Class: {class_name}",
-            font=self.f(26, "bold"),
+            font=self.f(header_px, "bold"),
             bootstyle="secondary"
         ).pack(side="left")
 
         remaining_label = ttk.Label(
             header,
             text=f"Students Left: {len(self.session_students)}",
-            font=self.f(26, "bold"),
+            font=self.f(header_px, "bold"),
             bootstyle="secondary"
         )
         remaining_label.pack(side="right")
 
         status_label = ttk.Label(
-            win,
+            main,
             text="Now Choosing 现在抽选",
-            font=self.f(46, "bold"),
-            bootstyle="primary"
+            font=self.f(header_px, "bold"),
+            bootstyle="primary",
+            anchor="center",
         )
-        status_label.pack(pady=(10, 10))
+        status_label.grid(row=1, column=0, pady=(4 if compact else 6, 4 if compact else 6), sticky="ew")
 
         # --- Borderless reel canvas ---
-        reel_wrap = ttk.Frame(win, padding=(18, 6))
-        reel_wrap.pack(fill="x", padx=10)
+        reel_wrap = ttk.Frame(main, padding=(18, 2 if compact else 4))
+        reel_wrap.grid(row=2, column=0, sticky="nsew", padx=10)
 
         canvas_w = SLOT_PANEL_W - 80
-        row_h = max(self.fs(92), 82)
-        canvas_h = row_h * 3 + self.fs(34)
+        reserved_h = self.fs(300 if compact else 260)
+        usable_h = max(self.fs(220), window_h - reserved_h)
+        row_min = self.fs(64 if compact else 78)
+        row_max = self.fs(84 if compact else 92)
+        row_h = max(row_min, min(row_max, int((usable_h - self.fs(24)) / 3)))
+        canvas_h = row_h * 3 + self.fs(24)
         cx = canvas_w // 2
         cy = canvas_h // 2
 
@@ -776,16 +798,16 @@ class InvisibleHandApp:
 
         # --- Progress + bottom panel ---
         progress = ttk.Progressbar(
-            win,
+            main,
             mode="determinate",
             maximum=100,
             bootstyle="primary",
             style="Slot.Horizontal.TProgressbar",
         )
-        progress.pack(fill="x", padx=25, pady=(8, 14))
+        progress.grid(row=3, column=0, sticky="ew", padx=25, pady=(6, 10))
 
-        buttons = ttk.Frame(win, padding=(18, 10))
-        buttons.pack(pady=(2, 10), fill="x")
+        buttons = ttk.Frame(main, padding=(18, 4 if compact else 6))
+        buttons.grid(row=4, column=0, sticky="ew", pady=(0 if compact else 2, 6))
 
         # --- Audio ---
         self.sound.play_music_loop(slot_sound)
@@ -838,7 +860,7 @@ class InvisibleHandApp:
 
             status_label.config(text="Selected 选中", bootstyle="success")
             try:
-                progress.pack_forget()
+                progress.grid_remove()
             except Exception:
                 pass
 
@@ -912,15 +934,22 @@ class InvisibleHandApp:
         button_frame.columnconfigure(2, weight=1, uniform="rate")
         button_frame.columnconfigure(3, weight=1, uniform="rate")
 
+        window_h = self._slot_window_height()
+        compact = window_h < 620
+        prompt_px = 26 if compact else 30
+        button_px = 18 if compact else 20
+        button_ipady = self.fs(10) if compact else self.fs(16)
+        prompt_pad = self.fs(6) if compact else self.fs(10)
+
         prompt = ttk.Label(
             button_frame,
             text="Rate the response • 评价",
-            font=self.f(30, "bold"),
+            font=self.f(prompt_px, "bold"),
             bootstyle="secondary",
             anchor="center",
             justify="center",
         )
-        prompt.grid(row=0, column=0, columnspan=4, sticky="ew", pady=(0, self.fs(10)))
+        prompt.grid(row=0, column=0, columnspan=4, sticky="ew", pady=(0, prompt_pad))
 
         def apply_rating(rating: str):
             self.student_grades[student_name] = rating
@@ -950,7 +979,7 @@ class InvisibleHandApp:
                 column=i,
                 sticky="ew",
                 padx=(0 if i == 0 else self.fs(10), 0),
-                ipady=self.fs(16),
+                ipady=button_ipady,
             )
 
     # ---------- Feedback popup ----------
@@ -960,7 +989,11 @@ class InvisibleHandApp:
         msg_win.title(title)
         msg_win.attributes("-topmost", True)
         msg_win.geometry(self._slot_window_geometry(parent_w=WINDOW_WIDTH))
-        msg_win.minsize(720, 560)
+        msg_win.minsize(720, self._slot_window_height())
+
+        window_h = self._slot_window_height()
+        compact = window_h < 620
+        header_px = 36 if compact else 46
 
         def exit_to_main():
             self.exit_requested = True
@@ -986,7 +1019,7 @@ class InvisibleHandApp:
         header = ttk.Label(
             outer,
             text="Feedback • 反馈",
-            font=self.f(46, "bold"),
+            font=self.f(header_px, "bold"),
             bootstyle="primary",
             anchor="center",
             justify="center",
