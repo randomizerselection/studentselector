@@ -6,6 +6,10 @@ This app helps a teacher pick students at random from a class list. You choose a
 
 In short: it is a classroom-friendly way to call on students fairly and keep simple participation notes.
 
+## Pedagogical rationale (high school)
+
+This tool is designed to increase engagement through structured cold calling. Randomized selection has been shown to be effective for participation and reduces selection bias, promoting equitable participation. The countdown "slot" effect prompts students to prepare and discuss while time runs, increasing readiness and reducing off-task slack. The rating-and-feedback step provides immediate, low-stakes formative assessment.
+
 ## How to use it
 
 1) Open the app.
