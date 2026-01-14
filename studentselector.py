@@ -226,6 +226,7 @@ class InvisibleHandApp:
 
         self.sound_enabled_var = tk.BooleanVar(value=True)
         self.sound.set_enabled(self.sound_enabled_var.get())
+        self.slot_effect_enabled_var = tk.BooleanVar(value=True)
 
         self.session_students: list[str] = []
         self.student_grades: dict[str, str] = {}
@@ -360,6 +361,10 @@ class InvisibleHandApp:
     def _on_sound_toggle(self):
         self.sound.set_enabled(self.sound_enabled_var.get())
 
+    def _on_slot_effect_toggle(self):
+        # Intentionally minimal; toggle is read when the slot window starts.
+        _ = self.slot_effect_enabled_var.get()
+
     # ---------- Main Screen ----------
 
     def _build_main_screen(self):
@@ -425,6 +430,34 @@ class InvisibleHandApp:
                 text="",
                 variable=self.sound_enabled_var,
                 command=self._on_sound_toggle,
+                bootstyle="round-toggle",
+            ).pack(side="right")
+
+        # Slot effect toggle row
+        slot_row = ttk.Frame(content, padding=(10, 0, 10, 0))
+        slot_row.pack(fill="x", pady=(6, 0))
+
+        ttk.Label(
+            slot_row,
+            text="Slot Effect",
+            font=self.f(22),
+            bootstyle="secondary"
+        ).pack(side="left")
+
+        try:
+            ttk.Checkbutton(
+                slot_row,
+                text="",
+                variable=self.slot_effect_enabled_var,
+                command=self._on_slot_effect_toggle,
+                bootstyle="success-round-toggle",
+            ).pack(side="right")
+        except Exception:
+            ttk.Checkbutton(
+                slot_row,
+                text="",
+                variable=self.slot_effect_enabled_var,
+                command=self._on_slot_effect_toggle,
                 bootstyle="round-toggle",
             ).pack(side="right")
 
@@ -574,6 +607,7 @@ class InvisibleHandApp:
     def _show_slot_window(self, class_name: str, final_student: str):
         duration = self._get_duration_seconds()
         slot_sound = self._slot_sound_for_duration(duration)
+        slot_effect_enabled = bool(self.slot_effect_enabled_var.get())
 
         win = ttk.Toplevel(self.root)
         win.title("Lucky Student")
@@ -831,7 +865,8 @@ class InvisibleHandApp:
         buttons.grid(row=4, column=0, sticky="ew", pady=(0 if compact else 2, 6))
 
         # --- Audio ---
-        self.sound.play_music_loop(slot_sound)
+        if slot_effect_enabled:
+            self.sound.play_music_loop(slot_sound)
 
         if duration >= 10:
             def _timeup_safe():
@@ -957,8 +992,29 @@ class InvisibleHandApp:
 
             win.after(16, _frame)
 
+        def _frame_no_effect():
+            if (not alive) or (not win.winfo_exists()):
+                return
+
+            now = time.time()
+            elapsed = now - start_time
+            progress["value"] = min(100, int(min(elapsed, duration) / max(0.001, duration) * 100))
+
+            if elapsed >= duration:
+                _finalize(center_item=t_cur)
+                return
+
+            win.after(50, _frame_no_effect)
+
         _render(0.0)
-        _frame()
+        if slot_effect_enabled:
+            _frame()
+        else:
+            reel.itemconfig(t_prev, state="hidden")
+            reel.itemconfig(t_next, state="hidden")
+            reel.itemconfig(t_cur, text="Please prepare your answer.", fill=secondary)
+            reel.itemconfig(t_cur, font=_fit_font("Please prepare your answer.", small_px, min_small_px))
+            _frame_no_effect()
 
     # ---------- Grading controls ----------
 
