@@ -222,8 +222,7 @@ class InvisibleHandApp:
         self.messages = load_messages_by_rating(MESSAGES_CSV)
 
         self.selected_class = ttk.StringVar(value="Select a Class")
-        self.minutes_var = ttk.IntVar(value=0)
-        self.seconds_var = ttk.IntVar(value=10)
+        self.time_preset_var = tk.IntVar(value=5)
 
         self.sound_enabled_var = tk.BooleanVar(value=True)
         self.sound.set_enabled(self.sound_enabled_var.get())
@@ -449,17 +448,29 @@ class InvisibleHandApp:
         timer_card.pack(fill="x", padx=10, pady=(0, 16))
 
         tf = ttk.Frame(timer_card)
-        tf.pack(fill="x")
+        tf.pack(fill="x", pady=(10, 0))
+        tf.columnconfigure(0, weight=1, uniform="preset")
+        tf.columnconfigure(1, weight=1, uniform="preset")
+        tf.columnconfigure(2, weight=1, uniform="preset")
+        tf.columnconfigure(3, weight=1, uniform="preset")
 
-        ttk.Label(tf, text="Min", font=self.f(20)).grid(row=0, column=0, sticky="w", padx=(0, 18))
-        ttk.Label(tf, text="Sec", font=self.f(20)).grid(row=0, column=1, sticky="w")
+        presets = [("5 sec", 5), ("30 sec", 30), ("1 min", 60), ("2 min", 120)]
+        preset_buttons = {}
 
-        ttk.Spinbox(tf, from_=0, to=60, textvariable=self.minutes_var, width=6, font=self.f(24)).grid(
-            row=1, column=0, sticky="w", padx=(0, 18), pady=(4, 0)
-        )
-        ttk.Spinbox(tf, from_=0, to=59, textvariable=self.seconds_var, width=6, font=self.f(24)).grid(
-            row=1, column=1, sticky="w", pady=(4, 0)
-        )
+        def _set_preset(seconds: int):
+            self.time_preset_var.set(seconds)
+            for sec, btn in preset_buttons.items():
+                btn.configure(bootstyle="info" if sec == seconds else "secondary")
+
+        for i, (label, seconds) in enumerate(presets):
+            btn = ttk.Button(
+                tf,
+                text=label,
+                bootstyle="info" if seconds == self.time_preset_var.get() else "secondary",
+                command=lambda s=seconds: _set_preset(s),
+            )
+            btn.grid(row=0, column=i, sticky="ew", padx=(0 if i == 0 else 10, 0), ipady=12)
+            preset_buttons[seconds] = btn
 
         # Main action
         ttk.Button(
@@ -516,11 +527,10 @@ class InvisibleHandApp:
 
     def _get_duration_seconds(self) -> float:
         try:
-            m = int(self.minutes_var.get())
-            s = int(self.seconds_var.get())
+            total = int(self.time_preset_var.get())
         except Exception:
-            m, s = 0, 10
-        total = max(1, (m * 60) + s)
+            total = 30
+        total = max(1, total)
         return float(total)
 
     def _slot_sound_for_duration(self, duration: float) -> str:
@@ -781,6 +791,10 @@ class InvisibleHandApp:
         next_raw = random.choice(pool)
 
         dim = _mix(fg, card_fill, 0.58)
+        small_px = 38
+        big_px = 62
+        min_small_px = 22
+        min_big_px = 32
 
         t_prev = reel.create_text(cx, cy - row_h, text=_format_name(prev_raw), fill=dim,
                                   anchor="center", justify="center")
@@ -789,12 +803,19 @@ class InvisibleHandApp:
         t_next = reel.create_text(cx, cy + row_h, text=_format_name(next_raw), fill=dim,
                                   anchor="center", justify="center")
 
-        def _style_items():
-            reel.itemconfig(t_prev, font=_fit_font(reel.itemcget(t_prev, "text"), 40, 22))
-            reel.itemconfig(t_next, font=_fit_font(reel.itemcget(t_next, "text"), 40, 22))
-            reel.itemconfig(t_cur, font=_fit_font(reel.itemcget(t_cur, "text"), 62, 32))
-
-        _style_items()
+        def _style_item(item, y_pos: float):
+            d = abs(y_pos - cy) / max(1, row_h)
+            d = min(1.0, d)
+            s = 1.0 - d
+            s = s * s
+            size_px = int(round(small_px + (big_px - small_px) * s))
+            min_px = int(round(min_small_px + (min_big_px - min_small_px) * s))
+            text = reel.itemcget(item, "text")
+            reel.itemconfig(
+                item,
+                font=_fit_font(text, size_px, min_px),
+                fill=_mix(dim, primary, s),
+            )
 
         # --- Progress + bottom panel ---
         progress = ttk.Progressbar(
@@ -823,12 +844,15 @@ class InvisibleHandApp:
         last_time = start_time
         phase = 0.0
 
-        max_rows_per_sec = 9.5
-        min_rows_per_sec = 1.5
+        max_rows_per_sec = 7.5
+        min_rows_per_sec = 1.0
+        cur_rows_per_sec = max_rows_per_sec
+        speed_smooth_tau = 0.18
 
         final_mode = False
-        final_roll_time = 0.55
-        final_mode_deadline = None
+        final_roll_time = 0.65
+        final_start_time = None
+        final_start_phase = 0.0
 
         def _rotate_once():
             nonlocal prev_raw, cur_raw, next_raw
@@ -838,19 +862,31 @@ class InvisibleHandApp:
             reel.itemconfig(t_prev, text=_format_name(prev_raw))
             reel.itemconfig(t_cur, text=_format_name(cur_raw))
             reel.itemconfig(t_next, text=_format_name(next_raw))
-            _style_items()
 
         def _render(phase_px: float):
-            reel.coords(t_prev, cx, (cy - row_h) - phase_px)
-            reel.coords(t_cur, cx, cy - phase_px)
-            reel.coords(t_next, cx, (cy + row_h) - phase_px)
+            y_prev = (cy - row_h) - phase_px
+            y_cur = cy - phase_px
+            y_next = (cy + row_h) - phase_px
 
-        def _finalize():
-            nonlocal cur_raw
+            reel.coords(t_prev, cx, y_prev)
+            reel.coords(t_cur, cx, y_cur)
+            reel.coords(t_next, cx, y_next)
+
+            _style_item(t_prev, y_prev)
+            _style_item(t_cur, y_cur)
+            _style_item(t_next, y_next)
+
+        def _finalize(center_item=None):
+            nonlocal cur_raw, t_prev, t_cur, t_next
+
+            if center_item is t_next:
+                t_cur, t_next = t_next, t_cur
+            elif center_item is t_prev:
+                t_cur, t_prev = t_prev, t_cur
 
             cur_raw = final_student
             reel.itemconfig(t_cur, text=_format_name(cur_raw))
-            _style_items()
+            reel.itemconfig(t_cur, font=_fit_font(reel.itemcget(t_cur, "text"), big_px, min_big_px))
 
             reel.itemconfig(band, fill=_mix(bg, success, 0.08), outline="")
             reel.itemconfig(t_cur, fill=success)
@@ -873,7 +909,7 @@ class InvisibleHandApp:
             self._render_grading_controls(win, buttons, class_name, final_student)
 
         def _frame():
-            nonlocal last_time, phase, final_mode, final_mode_deadline, next_raw
+            nonlocal last_time, phase, final_mode, final_start_time, final_start_phase, next_raw, cur_rows_per_sec
 
             if (not alive) or (not win.winfo_exists()):
                 return
@@ -886,33 +922,38 @@ class InvisibleHandApp:
             # Enter final mode: make NEXT be final_student so the next rotation lands it in center
             if (not final_mode) and (elapsed >= duration):
                 final_mode = True
-                final_mode_deadline = now + final_roll_time
+                final_start_time = now
+                final_start_phase = phase
                 next_raw = final_student
                 reel.itemconfig(t_next, text=_format_name(next_raw))
-                _style_items()
 
             if not final_mode:
                 t = max(0.0, min(1.0, elapsed / max(0.001, duration)))
-                rows_per_sec = min_rows_per_sec + (max_rows_per_sec - min_rows_per_sec) * ((1.0 - t) ** 2.1)
-                phase += (rows_per_sec * row_h) * dt
+                target_rows = min_rows_per_sec + (max_rows_per_sec - min_rows_per_sec) * ((1.0 - t) ** 2.1)
+                alpha = min(1.0, dt / max(0.001, speed_smooth_tau))
+                cur_rows_per_sec += (target_rows - cur_rows_per_sec) * alpha
+                phase += (cur_rows_per_sec * row_h) * dt
+
+                while phase >= row_h - 1e-6:
+                    phase -= row_h
+                    _rotate_once()
+
+                _render(phase)
             else:
-                remaining = max(0.0, row_h - phase)
-                remaining_time = max(0.05, (final_mode_deadline or now) - now)
-                phase += min(remaining, (remaining / remaining_time) * dt)
+                if final_start_time is None:
+                    final_start_time = now
+                    final_start_phase = phase
 
-            rotated = False
-            while phase >= row_h - 1e-6:
-                phase -= row_h
-                _rotate_once()
-                rotated = True
+                progress_t = min(1.0, (now - final_start_time) / max(0.001, final_roll_time))
+                eased = 1.0 - (1.0 - progress_t) ** 3
+                phase = final_start_phase + (row_h - final_start_phase) * eased
+                _render(phase)
 
-            _render(phase)
+                if progress_t >= 1.0:
+                    _finalize(center_item=t_next)
+                    return
 
             progress["value"] = min(100, int(min(elapsed, duration) / max(0.001, duration) * 100))
-
-            if final_mode and rotated and abs(phase) < 1e-3 and cur_raw == final_student:
-                _finalize()
-                return
 
             win.after(16, _frame)
 
