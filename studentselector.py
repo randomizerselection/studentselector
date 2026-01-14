@@ -868,11 +868,10 @@ class InvisibleHandApp:
         if slot_effect_enabled:
             self.sound.play_music_loop(slot_sound)
 
-        if duration >= 10:
-            def _timeup_safe():
-                if alive and win.winfo_exists():
-                    self.sound.play_timeup(TIMEUP_SOUND)
-            win.after(max(0, int(duration * 1000) - 200), _timeup_safe)
+        def _timeup_safe():
+            if alive and win.winfo_exists():
+                self.sound.play_timeup(TIMEUP_SOUND)
+        win.after(max(0, int(duration * 1000) - 200), _timeup_safe)
 
         # --- Animation ---
         start_time = time.time()
