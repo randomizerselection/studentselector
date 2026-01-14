@@ -228,6 +228,9 @@ class InvisibleHandApp:
         self.sound.set_enabled(self.sound_enabled_var.get())
         self.slot_effect_enabled_var = tk.BooleanVar(value=True)
 
+        self.session_students_by_class: dict[str, list[str]] = {}
+        self.student_grades_by_class: dict[str, dict[str, str]] = {}
+        self.active_class: str | None = None
         self.session_students: list[str] = []
         self.student_grades: dict[str, str] = {}
         self.exit_requested = False
@@ -581,11 +584,22 @@ class InvisibleHandApp:
             Messagebox.show_error(title="Error", message="Please select a valid class.")
             return
 
-        self.session_students = list(self.classes[class_name])
-        self.student_grades = {}
+        if class_name not in self.session_students_by_class:
+            roster = list(self.classes[class_name])
+            if not roster:
+                Messagebox.show_error(title="Error", message=f"No students found for {class_name}.")
+                return
+            self.session_students_by_class[class_name] = roster
+
+        if class_name not in self.student_grades_by_class:
+            self.student_grades_by_class[class_name] = {}
+
+        self.active_class = class_name
+        self.session_students = self.session_students_by_class[class_name]
+        self.student_grades = self.student_grades_by_class[class_name]
 
         if not self.session_students:
-            Messagebox.show_error(title="Error", message=f"No students found for {class_name}.")
+            self._show_grades_summary()
             return
 
         self._next_student(class_name)
