@@ -21,6 +21,45 @@ def resource_path(relative_path: str) -> str:
     return os.path.join(base_path, relative_path)
 
 
+def enable_windows_high_dpi() -> None:
+    """
+    Prevent Windows from bitmap-scaling the whole app on high-DPI displays.
+    """
+    if os.name != "nt":
+        return
+
+    try:
+        user32 = ctypes.windll.user32
+        shcore = getattr(ctypes.windll, "shcore", None)
+
+        set_context = getattr(user32, "SetProcessDpiAwarenessContext", None)
+        if set_context:
+            for context in (ctypes.c_void_p(-4), ctypes.c_void_p(-3)):
+                try:
+                    if set_context(context):
+                        return
+                except Exception:
+                    pass
+
+        if shcore:
+            set_awareness = getattr(shcore, "SetProcessDpiAwareness", None)
+            if set_awareness:
+                try:
+                    if set_awareness(2) == 0:
+                        return
+                except Exception:
+                    pass
+
+        set_aware = getattr(user32, "SetProcessDPIAware", None)
+        if set_aware:
+            try:
+                set_aware()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 # -------------------------
 # Configuration / Assets
 # -------------------------
@@ -53,6 +92,62 @@ RATING_SOUNDS = {
     "A": resource_path(r"assets\sound_a.mp3"),
     "B": resource_path(r"assets\sound_b.mp3"),
     "C": resource_path(r"assets\sound_c.mp3"),
+}
+
+FEEDBACK_LABELS = [
+    "Deep Thinking",
+    "Clear Explanation",
+    "Well Supported",
+    "Creative Idea",
+    "Independent",
+    "Confident",
+    "Improving",
+    "Good Use of Vocabulary",
+    "Accurate Detail",
+    "Strong Participation",
+]
+
+FEEDBACK_LABEL_PHRASES = {
+    "Deep Thinking": "deep thinking about the question",
+    "Clear Explanation": "a clear explanation",
+    "Well Supported": "well-supported ideas",
+    "Creative Idea": "a creative idea",
+    "Independent": "independent thinking",
+    "Confident": "confidence in your answer",
+    "Improving": "real improvement",
+    "Good Use of Vocabulary": "good use of vocabulary",
+    "Accurate Detail": "accurate detail",
+    "Strong Participation": "strong participation",
+}
+
+RATING_FEEDBACK_OPENERS = {
+    "A*": [
+        "Excellent response.",
+        "That was a standout answer.",
+        "That was top-level work.",
+    ],
+    "A": [
+        "Strong response.",
+        "That was a very solid answer.",
+        "You gave a strong answer there.",
+    ],
+    "B": [
+        "That was a solid attempt.",
+        "You gave a useful answer there.",
+        "That answer had some clear strengths.",
+    ],
+    "C": [
+        "Thank you for contributing.",
+        "You made a positive start there.",
+        "Thank you for having a go.",
+    ],
+}
+
+RATING_FEEDBACK_CLOSERS = {
+    "A*": "Keep using those strengths consistently.",
+    "A": "Keep pushing those strengths and you can reach the very top level.",
+    "B": "Keep building on those strengths and aim for an even fuller answer next time.",
+    "C": "Use those strengths as your starting point and build one clear idea at a time.",
 }
 
 SHORT_MAX = 4.99
@@ -239,7 +334,16 @@ class InvisibleHandApp:
         # Typography / classroom projection
         self.FONT_FAMILY = self._pick_font_family("Aptos", "Segoe UI", "Arial")
         self.HEADING_FONT_FAMILY = self._pick_font_family("Bahnschrift SemiBold", "Bahnschrift", "Aptos Display", self.FONT_FAMILY)
+        self.CJK_FONT_FAMILY = self._pick_font_family(
+            "Microsoft YaHei UI",
+            "Microsoft YaHei",
+            "Microsoft JhengHei UI",
+            "Yu Gothic UI",
+            self.FONT_FAMILY,
+        )
         self.MONO_FONT_FAMILY = self._pick_font_family("Consolas", "Cascadia Mono", "Courier New", self.FONT_FAMILY)
+        self.tk_scaling = self._detect_tk_scaling()
+        self.display_scale = self._detect_display_scale()
         self.ui_scale = self._compute_classroom_ui_scale()
         self._apply_classroom_font_defaults()
         self._apply_visual_theme()
@@ -257,9 +361,13 @@ class InvisibleHandApp:
 
         self.session_students_by_class: dict[str, list[str]] = {}
         self.student_grades_by_class: dict[str, dict[str, str]] = {}
+        self.student_ungraded_by_class: dict[str, list[str]] = {}
+        self.absent_students_by_class: dict[str, list[str]] = {}
         self.active_class: str | None = None
         self.session_students: list[str] = []
         self.student_grades: dict[str, str] = {}
+        self.student_ungraded: list[str] = []
+        self.absent_students: list[str] = []
         self.exit_requested = False
 
         # Window placement and behavior
@@ -275,11 +383,13 @@ class InvisibleHandApp:
         Scale fonts up based on screen height with a projection boost.
         """
         try:
-            screen_h = max(1, int(self.root.winfo_screenheight()))
+            screen_h = max(1, float(self.root.winfo_screenheight()))
         except Exception:
-            screen_h = 1080
+            screen_h = 1080.0
 
-        scale = screen_h / 1080.0
+        logical_screen_h = screen_h / max(1.0, self.tk_scaling)
+
+        scale = logical_screen_h / 1080.0
         scale = max(1.00, min(scale, 1.55))
 
         # projection boost
@@ -287,7 +397,20 @@ class InvisibleHandApp:
         return max(1.00, min(scale, 1.75))
 
     def fs(self, px: int) -> int:
-        return max(10, int(round(px * self.ui_scale)))
+        return max(1, int(round(px * self.display_scale)))
+
+    def ft(self, pt: int) -> int:
+        return max(10, int(round(pt * self.ui_scale)))
+
+    def _detect_tk_scaling(self) -> float:
+        try:
+            return max(1.0, float(self.root.winfo_fpixels("1i")) / 72.0)
+        except Exception:
+            return 1.0
+
+    def _detect_display_scale(self) -> float:
+        baseline_tk_scaling = 96.0 / 72.0
+        return max(1.0, self.tk_scaling / baseline_tk_scaling)
 
     def _pick_font_family(self, *candidates: str) -> str:
         fallback = "Segoe UI"
@@ -304,20 +427,37 @@ class InvisibleHandApp:
 
         return fallback
 
+    def _contains_cjk(self, text: str) -> bool:
+        for ch in text or "":
+            o = ord(ch)
+            if (
+                0x4E00 <= o <= 0x9FFF or
+                0x3400 <= o <= 0x4DBF or
+                0x3040 <= o <= 0x30FF or
+                0xAC00 <= o <= 0xD7AF
+            ):
+                return True
+        return False
+
+    def _heading_font_family_for_text(self, text: str) -> str:
+        if self._contains_cjk(text):
+            return self.CJK_FONT_FAMILY
+        return self.HEADING_FONT_FAMILY
+
     def f(self, px: int, weight: str | None = None) -> tuple:
         if weight:
-            return (self.FONT_FAMILY, self.fs(px), weight)
-        return (self.FONT_FAMILY, self.fs(px))
+            return (self.FONT_FAMILY, self.ft(px), weight)
+        return (self.FONT_FAMILY, self.ft(px))
 
     def hf(self, px: int, weight: str | None = None) -> tuple:
         if weight:
-            return (self.HEADING_FONT_FAMILY, self.fs(px), weight)
-        return (self.HEADING_FONT_FAMILY, self.fs(px))
+            return (self.HEADING_FONT_FAMILY, self.ft(px), weight)
+        return (self.HEADING_FONT_FAMILY, self.ft(px))
 
     def mf(self, px: int, weight: str | None = None) -> tuple:
         if weight:
-            return (self.MONO_FONT_FAMILY, self.fs(px), weight)
-        return (self.MONO_FONT_FAMILY, self.fs(px))
+            return (self.MONO_FONT_FAMILY, self.ft(px), weight)
+        return (self.MONO_FONT_FAMILY, self.ft(px))
 
     def _fit_font_to_width(
         self,
@@ -333,8 +473,8 @@ class InvisibleHandApp:
         the font until it fits (or hits min).
         """
         family = family or self.HEADING_FONT_FAMILY
-        size = self.fs(start_px)
-        min_size = self.fs(min_px)
+        size = self.ft(start_px)
+        min_size = self.ft(min_px)
 
         test_font = tkfont.Font(family=family, size=size, weight=weight)
         while size > min_size and test_font.measure(text) > max_px:
@@ -387,9 +527,10 @@ class InvisibleHandApp:
         except Exception:
             pass
 
-        # Small scaling nudge for projector clarity
+        # Match Tk's scaling to the current monitor DPI instead of forcing a
+        # fixed value that can become soft on external displays.
         try:
-            self.root.tk.call("tk", "scaling", 1.15)
+            self.root.tk.call("tk", "scaling", self.tk_scaling)
         except Exception:
             pass
 
@@ -427,12 +568,24 @@ class InvisibleHandApp:
         roster = list(self.classes.get(class_name, [])) if class_name else []
         session_roster = self.session_students_by_class.get(class_name, roster)
         grades = self.student_grades_by_class.get(class_name, {})
+        ungraded = self.student_ungraded_by_class.get(class_name, [])
+        absent = self.absent_students_by_class.get(class_name, [])
         return {
             "class_name": class_name or "No class selected",
             "roster_total": len(roster),
             "remaining": len(session_roster),
             "graded": len(grades),
+            "ungraded": len(ungraded),
+            "absent": len(absent),
         }
+
+    def _format_metrics_summary(self, metrics: dict[str, int | str]) -> str:
+        parts = [f"{metrics['remaining']} left", f"{metrics['graded']} graded"]
+        if metrics.get("ungraded"):
+            parts.append(f"{metrics['ungraded']} no grade")
+        if metrics.get("absent"):
+            parts.append(f"{metrics['absent']} absent")
+        return " | ".join(parts)
 
     def _rating_meta(self, rating: str) -> dict[str, str]:
         meta = {
@@ -442,6 +595,23 @@ class InvisibleHandApp:
             "C": {"label": "Needs support", "bg": self.palette["danger"], "fg": "#371814"},
         }
         return meta.get(rating, {"label": "Recorded", "bg": self.palette["panel_alt"], "fg": self.palette["text_light"]})
+
+    def _natural_join(self, items: list[str]) -> str:
+        if not items:
+            return ""
+        if len(items) == 1:
+            return items[0]
+        if len(items) == 2:
+            return f"{items[0]} and {items[1]}"
+        return f"{', '.join(items[:-1])}, and {items[-1]}"
+
+    def _build_feedback_message(self, student_name: str, rating: str, labels: list[str]) -> str:
+        ordered_labels = [label for label in FEEDBACK_LABELS if label in labels]
+        label_phrases = [FEEDBACK_LABEL_PHRASES.get(label, label.lower()) for label in ordered_labels]
+        opener = random.choice(RATING_FEEDBACK_OPENERS.get(rating, ["Good work."]))
+        strengths = self._natural_join(label_phrases)
+        closer = RATING_FEEDBACK_CLOSERS.get(rating, "Keep going.")
+        return f"{student_name}, {opener} You showed {strengths}. {closer}"
 
     def _apply_visual_theme(self):
         p = self.palette
@@ -601,6 +771,55 @@ class InvisibleHandApp:
             lightcolor=self._shade(p["danger"], "#ffffff", 0.05),
             padding=self.fs(10),
         )
+        self.style.configure(
+            "NoGrade.TButton",
+            font=self.hf(15, "bold"),
+            foreground=p["text_dark"],
+            background=p["bg_alt"],
+            bordercolor=p["line"],
+            darkcolor=self._shade(p["bg_alt"], "#000000", 0.08),
+            lightcolor=self._shade(p["bg_alt"], "#ffffff", 0.04),
+            padding=self.fs(10),
+        )
+        self.style.configure(
+            "Absent.TButton",
+            font=self.hf(15, "bold"),
+            foreground=p["text_dark"],
+            background=p["bg_alt"],
+            bordercolor=p["line"],
+            darkcolor=self._shade(p["bg_alt"], "#000000", 0.08),
+            lightcolor=self._shade(p["bg_alt"], "#ffffff", 0.04),
+            padding=self.fs(10),
+        )
+        self.style.map("Absent.TButton", background=[("active", self._shade(p["bg_alt"], "#000000", 0.03))])
+        self.style.configure(
+            "LabelToggleOff.TButton",
+            font=self.hf(13, "bold"),
+            foreground=p["text_dark"],
+            background=p["panel"],
+            bordercolor=p["line"],
+            darkcolor=self._shade(p["panel"], "#000000", 0.08),
+            lightcolor=self._shade(p["panel"], "#ffffff", 0.04),
+            padding=self.fs(8),
+        )
+        self.style.map(
+            "LabelToggleOff.TButton",
+            background=[("active", self._shade(p["panel_alt"], "#ffffff", 0.04))],
+        )
+        self.style.configure(
+            "LabelToggleOn.TButton",
+            font=self.hf(13, "bold"),
+            foreground="#f8fcff",
+            background=p["accent_alt"],
+            bordercolor=p["accent_alt"],
+            darkcolor=self._shade(p["accent_alt"], "#000000", 0.12),
+            lightcolor=self._shade(p["accent_alt"], "#ffffff", 0.05),
+            padding=self.fs(8),
+        )
+        self.style.map(
+            "LabelToggleOn.TButton",
+            background=[("active", self._shade(p["accent_alt"], "#ffffff", 0.08))],
+        )
 
         self.style.configure(
             "Summary.Vertical.TScrollbar",
@@ -640,8 +859,13 @@ class InvisibleHandApp:
 
     def _root_window_size(self) -> tuple[int, int]:
         _, _, work_w, work_h = self._desktop_work_area()
-        window_w = min(WINDOW_WIDTH, max(440, work_w - 24))
-        window_h = max(540, work_h - max(12, TOP_PADDING_Y + 12))
+        target_w = self.fs(WINDOW_WIDTH)
+        min_w = self.fs(440)
+        edge_gap = self.fs(24)
+        top_gap = max(self.fs(12), self.fs(TOP_PADDING_Y + 12))
+
+        window_w = min(target_w, max(min_w, work_w - edge_gap))
+        window_h = max(self.fs(540), work_h - top_gap)
         return window_w, window_h
 
     def _configure_root_window(self):
@@ -651,38 +875,122 @@ class InvisibleHandApp:
         work_left, work_top, work_w, work_h = self._desktop_work_area()
         window_w, window_h = self._root_window_size()
 
-        x = work_left + max(0, work_w - window_w - TOP_RIGHT_PADDING_X)
-        y = work_top + TOP_PADDING_Y
+        x = work_left + max(0, work_w - window_w - self.fs(TOP_RIGHT_PADDING_X))
+        y = work_top + self.fs(TOP_PADDING_Y)
         self.root.geometry(f"{window_w}x{window_h}+{x}+{y}")
-        self.root.minsize(min(WINDOW_WIDTH, window_w), min(max(520, work_h - 80), window_h))
+        self.root.minsize(
+            min(self.fs(WINDOW_WIDTH), window_w),
+            min(max(self.fs(520), work_h - self.fs(80)), window_h),
+        )
         self.root.maxsize(work_w, work_h)
 
-    def _slot_window_height(self) -> int:
-        _, work_top, _, work_h = self._desktop_work_area()
-        available_h = max(480, work_h - max(SLOT_PANEL_Y - work_top, 0) - 24)
-        return min(SLOT_PANEL_H, max(SLOT_PANEL_MIN_H, available_h))
+    def _monitor_work_area_for_window(self, win) -> tuple[int, int, int, int]:
+        try:
+            if win and win.winfo_exists():
+                hwnd = int(win.winfo_id())
+                monitor = ctypes.windll.user32.MonitorFromWindow(hwnd, 2)
+                if monitor:
+                    class RECT(ctypes.Structure):
+                        _fields_ = [
+                            ("left", ctypes.c_long),
+                            ("top", ctypes.c_long),
+                            ("right", ctypes.c_long),
+                            ("bottom", ctypes.c_long),
+                        ]
 
-    def _slot_window_size(self) -> tuple[int, int]:
-        work_left, work_top, work_w, work_h = self._desktop_work_area()
-        available_h = max(480, work_h - max(SLOT_PANEL_Y - work_top, 0) - 24)
-        window_h = min(SLOT_PANEL_H, max(SLOT_PANEL_MIN_H, available_h))
-        window_w = min(SLOT_PANEL_W, max(720, work_w - 40))
+                    class MONITORINFO(ctypes.Structure):
+                        _fields_ = [
+                            ("cbSize", ctypes.c_uint),
+                            ("rcMonitor", RECT),
+                            ("rcWork", RECT),
+                            ("dwFlags", ctypes.c_uint),
+                        ]
+
+                    info = MONITORINFO()
+                    info.cbSize = ctypes.sizeof(MONITORINFO)
+                    ok = ctypes.windll.user32.GetMonitorInfoW(monitor, ctypes.byref(info))
+                    if ok:
+                        work = info.rcWork
+                        return work.left, work.top, work.right - work.left, work.bottom - work.top
+        except Exception:
+            pass
+
+        return self._desktop_work_area()
+
+    def _capture_window_rect(self, win) -> tuple[int, int, int, int] | None:
+        try:
+            if win and win.winfo_exists():
+                win.update_idletasks()
+                return win.winfo_x(), win.winfo_y(), win.winfo_width(), win.winfo_height()
+        except Exception:
+            pass
+        return None
+
+    def _slot_window_height(self, work_area: tuple[int, int, int, int] | None = None) -> int:
+        _, work_top, _, work_h = work_area or self._desktop_work_area()
+        available_h = max(self.fs(480), work_h - max(self.fs(SLOT_PANEL_Y) - work_top, 0) - self.fs(24))
+        return min(self.fs(SLOT_PANEL_H), max(self.fs(SLOT_PANEL_MIN_H), available_h))
+
+    def _slot_window_size(self, work_area: tuple[int, int, int, int] | None = None) -> tuple[int, int]:
+        work_left, work_top, work_w, work_h = work_area or self._desktop_work_area()
+        available_h = max(self.fs(480), work_h - max(self.fs(SLOT_PANEL_Y) - work_top, 0) - self.fs(24))
+        window_h = min(self.fs(SLOT_PANEL_H), max(self.fs(SLOT_PANEL_MIN_H), available_h))
+        window_w = min(self.fs(SLOT_PANEL_W), max(self.fs(720), work_w - self.fs(40)))
         return window_w, window_h
 
-    def _slot_window_geometry(self, parent_w: int) -> str:
-        work_left, work_top, work_w, work_h = self._desktop_work_area()
-        window_w, window_h = self._slot_window_size()
+    def _slot_window_geometry(
+        self,
+        parent_w: int,
+        anchor_rect: tuple[int, int, int, int] | None = None,
+        anchor_work_area: tuple[int, int, int, int] | None = None,
+    ) -> str:
+        work_left, work_top, work_w, work_h = anchor_work_area or self._desktop_work_area()
+        window_w, window_h = self._slot_window_size(work_area=(work_left, work_top, work_w, work_h))
 
-        x = work_left + max(0, work_w - window_w - SLOT_PANEL_MARGIN_RIGHT)
-        y = work_top + min(SLOT_PANEL_Y, max(0, work_h - window_h - 12))
+        x = work_left + max(0, work_w - window_w - self.fs(SLOT_PANEL_MARGIN_RIGHT))
+        y = work_top + min(self.fs(SLOT_PANEL_Y), max(0, work_h - window_h - self.fs(12)))
+
+        if anchor_rect is not None:
+            anchor_x, anchor_y, _, _ = anchor_rect
+            max_x = work_left + max(0, work_w - window_w)
+            max_y = work_top + max(0, work_h - window_h)
+            x = max(work_left, min(anchor_x, max_x))
+            y = max(work_top, min(anchor_y, max_y))
+            return f"{window_w}x{window_h}+{x}+{y}"
 
         root_x = self.root.winfo_x() if self.root.winfo_ismapped() else x
-        root_w = self.root.winfo_width() if self.root.winfo_ismapped() else WINDOW_WIDTH
+        root_w = self.root.winfo_width() if self.root.winfo_ismapped() else self.fs(WINDOW_WIDTH)
         control_left = root_x
         if x < control_left + root_w:
-            x = max(work_left, control_left - window_w - 15)
+            x = max(work_left, control_left - window_w - self.fs(15))
 
         return f"{window_w}x{window_h}+{x}+{y}"
+
+    def _grow_window_to_fit(self, win, min_bottom_margin: int = 12):
+        """
+        Expand a toplevel vertically when newly-added controls exceed the initial
+        geometry, while keeping the window inside the desktop work area.
+        """
+        try:
+            win.update_idletasks()
+        except Exception:
+            return
+
+        current_w = win.winfo_width()
+        current_h = win.winfo_height()
+        needed_h = win.winfo_reqheight()
+        if needed_h <= current_h:
+            return
+
+        work_left, work_top, work_w, work_h = self._monitor_work_area_for_window(win)
+        target_h = min(work_h, needed_h)
+        if target_h <= current_h:
+            return
+
+        x = max(work_left, min(win.winfo_x(), work_left + work_w - current_w))
+        y_max = work_top + max(0, work_h - target_h - min_bottom_margin)
+        y = max(work_top, min(win.winfo_y(), y_max))
+        win.geometry(f"{current_w}x{target_h}+{x}+{y}")
 
     def _clear_root(self):
         for w in self.root.winfo_children():
@@ -743,7 +1051,7 @@ class InvisibleHandApp:
         tk.Label(
             header,
             text=(
-                f"{metrics['remaining']} left | {metrics['graded']} graded"
+                self._format_metrics_summary(metrics)
                 if has_class else
                 "Select a class to start"
             ),
@@ -828,7 +1136,7 @@ class InvisibleHandApp:
         ttk.Button(controls, text="Play Intro", style="Utility.TButton", command=self._play_intro).grid(
             row=0, column=0, sticky="ew", padx=(0, card_gap), ipady=d(4)
         )
-        ttk.Button(controls, text="View Grades", style="SecondaryAction.TButton", command=self._show_grades_summary).grid(
+        ttk.Button(controls, text="View Summary", style="Utility.TButton", command=self._show_grades_summary).grid(
             row=0, column=1, sticky="ew", padx=card_gap, ipady=d(4)
         )
         ttk.Button(controls, text="Play Closing", style="Utility.TButton", command=self._play_closing).grid(
@@ -890,10 +1198,16 @@ class InvisibleHandApp:
 
         if class_name not in self.student_grades_by_class:
             self.student_grades_by_class[class_name] = {}
+        if class_name not in self.student_ungraded_by_class:
+            self.student_ungraded_by_class[class_name] = []
+        if class_name not in self.absent_students_by_class:
+            self.absent_students_by_class[class_name] = []
 
         self.active_class = class_name
         self.session_students = self.session_students_by_class[class_name]
         self.student_grades = self.student_grades_by_class[class_name]
+        self.student_ungraded = self.student_ungraded_by_class[class_name]
+        self.absent_students = self.absent_students_by_class[class_name]
 
         if not self.session_students:
             self._show_grades_summary()
@@ -901,7 +1215,12 @@ class InvisibleHandApp:
 
         self._next_student(class_name)
 
-    def _next_student(self, class_name: str):
+    def _next_student(
+        self,
+        class_name: str,
+        anchor_rect: tuple[int, int, int, int] | None = None,
+        anchor_work_area: tuple[int, int, int, int] | None = None,
+    ):
         if self.exit_requested:
             self._build_main_screen()
             return
@@ -911,22 +1230,40 @@ class InvisibleHandApp:
             return
 
         final_student = random.choice(self.session_students)
-        self._show_slot_window(class_name, final_student)
+        self._show_slot_window(
+            class_name,
+            final_student,
+            anchor_rect=anchor_rect,
+            anchor_work_area=anchor_work_area,
+        )
 
     # ---------- Slot window ----------
 
-    def _show_slot_window(self, class_name: str, final_student: str):
+    def _show_slot_window(
+        self,
+        class_name: str,
+        final_student: str,
+        anchor_rect: tuple[int, int, int, int] | None = None,
+        anchor_work_area: tuple[int, int, int, int] | None = None,
+    ):
         duration = self._get_duration_seconds()
         slot_sound = self._slot_sound_for_duration(duration)
         slot_effect_enabled = bool(self.slot_effect_enabled_var.get())
-        window_w, window_h = self._slot_window_size()
+        target_work_area = anchor_work_area or self._desktop_work_area()
+        window_w, window_h = self._slot_window_size(work_area=target_work_area)
 
         win = ttk.Toplevel(self.root)
         win.title(f"{class_name} - Select Student")
         win.attributes("-topmost", True)
-        compact = window_h < 620 or window_w < 820
-        win.geometry(self._slot_window_geometry(parent_w=WINDOW_WIDTH))
-        _, _, work_w, work_h = self._desktop_work_area()
+        compact = window_h < 700 or window_w < 900
+        win.geometry(
+            self._slot_window_geometry(
+                parent_w=WINDOW_WIDTH,
+                anchor_rect=anchor_rect,
+                anchor_work_area=anchor_work_area,
+            )
+        )
+        _, _, work_w, work_h = target_work_area
         win.minsize(min(window_w, 720), min(window_h, 500))
         win.maxsize(work_w, work_h)
         win.configure(bg=self.palette["bg"])
@@ -984,10 +1321,10 @@ class InvisibleHandApp:
         reel_wrap.pack(fill="x")
 
         canvas_w = max(560, window_w - self.fs(100))
-        reserved_h = self.fs(210 if compact else 230)
+        reserved_h = self.fs(184 if compact else 230)
         usable_h = max(self.fs(170), window_h - reserved_h)
         row_min = self.fs(42 if compact else 48)
-        row_max = self.fs(56 if compact else 62)
+        row_max = self.fs(52 if compact else 62)
         row_h = max(row_min, min(row_max, int((usable_h - self.fs(54)) / 3)))
         canvas_h = row_h * 3 + self.fs(54)
         cx = canvas_w // 2
@@ -1045,44 +1382,37 @@ class InvisibleHandApp:
             width=0,
         )
 
-        def _is_cjk(ch: str) -> bool:
-            o = ord(ch)
-            return (
-                0x4E00 <= o <= 0x9FFF or
-                0x3400 <= o <= 0x4DBF or
-                0x3040 <= o <= 0x30FF or
-                0xAC00 <= o <= 0xD7AF
-            )
 
         def _format_name(name: str) -> str:
             s = (name or "").strip()
             if not s:
                 return s
             if " " in s:
-                has_cjk = any(_is_cjk(ch) for ch in s)
+                has_cjk = self._contains_cjk(s)
                 has_latin = any(("A" <= ch <= "Z") or ("a" <= ch <= "z") for ch in s)
                 if has_cjk and has_latin:
                     left, right = s.split(None, 1)
                     return f"{left} · {right}"
             return s
 
-        font_cache: dict[tuple[str, int, int, str], tuple] = {}
+        font_cache: dict[tuple[str, str, int, int, str], tuple] = {}
         max_text_w = canvas_w - (pad * 2) - self.fs(110)
 
         def _fit_font(text: str, base_px: int, min_px: int, weight="bold") -> tuple:
-            key = (text, base_px, min_px, weight)
+            family = self._heading_font_family_for_text(text)
+            key = (family, text, base_px, min_px, weight)
             if key in font_cache:
                 return font_cache[key]
 
-            size = self.fs(base_px)
-            min_size = self.fs(min_px)
-            fnt = tkfont.Font(family=self.HEADING_FONT_FAMILY, size=size, weight=weight)
+            size = self.ft(base_px)
+            min_size = self.ft(min_px)
+            fnt = tkfont.Font(family=family, size=size, weight=weight)
 
             while size > min_size and fnt.measure(text) > max_text_w:
                 size -= 1
                 fnt.configure(size=size)
 
-            font_cache[key] = (self.HEADING_FONT_FAMILY, size, weight)
+            font_cache[key] = (family, size, weight)
             return font_cache[key]
 
         pool = self.session_students[:] if self.session_students else [final_student]
@@ -1285,58 +1615,198 @@ class InvisibleHandApp:
             w.destroy()
 
         p = self.palette
-        button_frame.configure(style="SlotBg.TFrame", padding=(0, self.fs(8), 0, 0))
-        card = tk.Frame(button_frame, bg=p["bg"])
+        button_frame.configure(style="SlotBg.TFrame", padding=(0, self.fs(14), 0, 0))
+        shell = tk.Frame(button_frame, bg=p["bg"])
+        shell.pack(fill="x")
+
+        card = tk.Frame(
+            shell,
+            bg=p["panel_alt"],
+            padx=self.fs(18),
+            pady=self.fs(16),
+            highlightthickness=1,
+            highlightbackground=p["line_soft"],
+        )
         card.pack(fill="x")
         for col in range(4):
             card.columnconfigure(col, weight=1, uniform="rate")
 
-        window_h = self._slot_window_height()
-        compact = window_h < 620
+        work_area = self._monitor_work_area_for_window(win)
+        window_h = self._slot_window_height(work_area=work_area)
+        compact = window_h < 700
         button_ipady = self.fs(10) if compact else self.fs(14)
+        utility_ipady = self.fs(8) if compact else self.fs(10)
+        button_gap = self.fs(10 if compact else 12)
+        absent_students = self.absent_students_by_class.setdefault(class_name, [])
+        ungraded_students = self.student_ungraded_by_class.setdefault(class_name, [])
+
+        def _clear_non_grade_marks():
+            if student_name in absent_students:
+                absent_students.remove(student_name)
+            if student_name in ungraded_students:
+                ungraded_students.remove(student_name)
 
         def apply_rating(rating: str):
+            _clear_non_grade_marks()
             self.student_grades[student_name] = rating
             self.sound.play_music_once(RATING_SOUNDS.get(rating, ""))
 
             msg_list = self.messages.get(rating) or []
             msg = random.choice(msg_list) if msg_list else "Noted."
+            anchor_rect = self._capture_window_rect(win)
+            anchor_work_area = self._monitor_work_area_for_window(win)
 
             try:
                 win.destroy()
             except Exception:
                 pass
 
-            self._show_message_popup(title="Feedback", message=msg, class_name=class_name)
+            self._show_message_popup(
+                title="Feedback",
+                message=msg,
+                class_name=class_name,
+                anchor_rect=anchor_rect,
+                anchor_work_area=anchor_work_area,
+            )
 
-        rating_styles = {"A*": "GradeAStar.TButton", "A": "GradeA.TButton", "B": "GradeB.TButton", "C": "GradeC.TButton"}
+        def mark_no_grade():
+            self.student_grades.pop(student_name, None)
+            if student_name in absent_students:
+                absent_students.remove(student_name)
+            if student_name not in ungraded_students:
+                ungraded_students.append(student_name)
+            anchor_rect = self._capture_window_rect(win)
+            anchor_work_area = self._monitor_work_area_for_window(win)
 
-        for i, rating in enumerate(("A*", "A", "B", "C")):
-            meta = self._rating_meta(rating)
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+            self._show_message_popup(
+                title="No Grade",
+                message=f"No grade recorded for {student_name} this round.",
+                class_name=class_name,
+                anchor_rect=anchor_rect,
+                anchor_work_area=anchor_work_area,
+            )
+
+        def mark_absent():
+            self.student_grades.pop(student_name, None)
+            if student_name in ungraded_students:
+                ungraded_students.remove(student_name)
+            if student_name not in absent_students:
+                absent_students.append(student_name)
+            anchor_rect = self._capture_window_rect(win)
+            anchor_work_area = self._monitor_work_area_for_window(win)
+
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+            self._show_message_popup(
+                title="Absent",
+                message=f"{student_name} was marked absent and removed from today's list.",
+                class_name=class_name,
+                anchor_rect=anchor_rect,
+                anchor_work_area=anchor_work_area,
+            )
+
+        actions = [
+            ("A*", self._rating_meta("A*")["label"], "GradeAStar.TButton", lambda: apply_rating("A*")),
+            ("A", self._rating_meta("A")["label"], "GradeA.TButton", lambda: apply_rating("A")),
+            ("B", self._rating_meta("B")["label"], "GradeB.TButton", lambda: apply_rating("B")),
+            ("C", self._rating_meta("C")["label"], "GradeC.TButton", lambda: apply_rating("C")),
+            ("No Grade", "Skip grading", "NoGrade.TButton", mark_no_grade),
+            ("Absent", "Remove for today", "Absent.TButton", mark_absent),
+        ]
+
+        title_wrap = max(self.fs(300), self._slot_window_size(work_area=work_area)[0] - self.fs(180))
+        tk.Label(
+            card,
+            text=f"Choose an outcome for {student_name}",
+            font=self.hf(18 if compact else 20, "bold"),
+            bg=p["panel_alt"],
+            fg=p["text_light"],
+            anchor="w",
+            justify="left",
+            wraplength=title_wrap,
+        ).grid(row=0, column=0, columnspan=4, sticky="w")
+
+        tk.Label(
+            card,
+            text="Grades are the primary action. Attendance shortcuts sit below.",
+            font=self.f(11 if compact else 12),
+            bg=p["panel_alt"],
+            fg=p["text_muted"],
+            anchor="w",
+            justify="left",
+            wraplength=title_wrap,
+        ).grid(row=1, column=0, columnspan=4, sticky="w", pady=(self.fs(4), self.fs(14)))
+
+        grade_actions = actions[:4]
+        utility_actions = actions[4:]
+
+        for col, (title, subtitle, style, command) in enumerate(grade_actions):
             ttk.Button(
                 card,
-                text=f"{rating}\n{meta['label']}",
-                style=rating_styles[rating],
-                command=lambda r=rating: apply_rating(r),
+                text=f"{title}\n{subtitle}",
+                style=style,
+                command=command,
             ).grid(
-                row=0,
-                column=i,
-                sticky="ew",
-                padx=(0 if i == 0 else self.fs(10), 0),
+                row=2,
+                column=col,
+                sticky="nsew",
+                padx=(0 if col == 0 else button_gap, 0),
+                pady=(0, self.fs(10)),
                 ipady=button_ipady,
             )
 
+        for i, (title, subtitle, style, command) in enumerate(utility_actions):
+            start_col = i * 2
+            ttk.Button(
+                card,
+                text=f"{title}\n{subtitle}",
+                style=style,
+                command=command,
+            ).grid(
+                row=3,
+                column=start_col,
+                columnspan=2,
+                sticky="ew",
+                padx=(0, button_gap // 2) if i == 0 else (button_gap // 2, 0),
+                ipady=utility_ipady,
+            )
+
+        self._grow_window_to_fit(win)
+
     # ---------- Feedback popup ----------
 
-    def _show_message_popup(self, title: str, message: str, class_name: str):
+    def _show_message_popup(
+        self,
+        title: str,
+        message: str,
+        class_name: str,
+        anchor_rect: tuple[int, int, int, int] | None = None,
+        anchor_work_area: tuple[int, int, int, int] | None = None,
+    ):
+        target_work_area = anchor_work_area or self._desktop_work_area()
         msg_win = ttk.Toplevel(self.root)
         msg_win.title(f"{class_name} - {title}")
         msg_win.attributes("-topmost", True)
-        msg_win.geometry(self._slot_window_geometry(parent_w=WINDOW_WIDTH))
-        msg_win.minsize(760, self._slot_window_height())
+        msg_win.geometry(
+            self._slot_window_geometry(
+                parent_w=WINDOW_WIDTH,
+                anchor_rect=anchor_rect,
+                anchor_work_area=anchor_work_area,
+            )
+        )
+        msg_win.minsize(self.fs(760), self._slot_window_height(work_area=target_work_area))
         msg_win.configure(bg=self.palette["bg"])
         p = self.palette
         metrics = self._class_metrics(class_name)
+        message_wrap = self._slot_window_size(work_area=target_work_area)[0] - self.fs(220)
 
         def exit_to_main():
             self.exit_requested = True
@@ -1359,7 +1829,7 @@ class InvisibleHandApp:
 
         tk.Label(
             outer,
-            text=f"{metrics['remaining']} left | {metrics['graded']} graded",
+            text=self._format_metrics_summary(metrics),
             font=self.f(12),
             bg=p["bg"],
             fg=p["text_muted"],
@@ -1385,7 +1855,7 @@ class InvisibleHandApp:
             font=self.f(24),
             bg=p["panel"],
             fg=p["text_light"],
-            wraplength=SLOT_PANEL_W - 220,
+            wraplength=message_wrap,
             justify="center",
         ).pack(fill="both", expand=True, pady=(0, self.fs(10)))
 
@@ -1400,7 +1870,7 @@ class InvisibleHandApp:
             font=self.f(24),
             bg=p["panel"],
             fg=p["text_light"],
-            wraplength=SLOT_PANEL_W - 220,
+            wraplength=message_wrap,
             justify="center",
         ).grid(row=0, column=0, sticky="nsew")
 
@@ -1410,11 +1880,17 @@ class InvisibleHandApp:
         btns.grid_columnconfigure(1, weight=1)
 
         def next_student():
+            next_anchor_rect = self._capture_window_rect(msg_win)
+            next_anchor_work_area = self._monitor_work_area_for_window(msg_win)
             try:
                 msg_win.destroy()
             except Exception:
                 pass
-            self._next_student(class_name)
+            self._next_student(
+                class_name,
+                anchor_rect=next_anchor_rect,
+                anchor_work_area=next_anchor_work_area,
+            )
 
         ttk.Button(
             btns,
@@ -1430,32 +1906,38 @@ class InvisibleHandApp:
             command=exit_to_main
         ).grid(row=0, column=1, sticky="ew", padx=(self.fs(10), 0), ipady=self.fs(12))
 
-    # ---------- Grades summary ----------
+    # ---------- Session summary ----------
 
     def _show_grades_summary(self):
         self.exit_requested = False
 
         win = ttk.Toplevel(self.root)
-        win.title("Grades Summary")
+        win.title("Session Summary")
         win.attributes("-topmost", True)
-        win.geometry("860x760+30+80")
-        win.minsize(760, 680)
+        win.geometry(f"{self.fs(860)}x{self.fs(760)}+{self.fs(30)}+{self.fs(80)}")
+        win.minsize(self.fs(760), self.fs(680))
         win.configure(bg=self.palette["bg"])
         p = self.palette
 
         class_name = self.active_class or self._active_or_selected_class() or "Current Session"
         if self.active_class and self.active_class in self.student_grades_by_class:
             grades = self.student_grades_by_class.get(self.active_class, {})
+            ungraded = self.student_ungraded_by_class.get(self.active_class, [])
+            absent = self.absent_students_by_class.get(self.active_class, [])
             remaining = len(self.session_students_by_class.get(self.active_class, []))
             roster_total = len(self.classes.get(self.active_class, []))
         elif class_name in self.student_grades_by_class:
             grades = self.student_grades_by_class.get(class_name, {})
+            ungraded = self.student_ungraded_by_class.get(class_name, [])
+            absent = self.absent_students_by_class.get(class_name, [])
             remaining = len(self.session_students_by_class.get(class_name, self.classes.get(class_name, [])))
             roster_total = len(self.classes.get(class_name, []))
         else:
             grades = self.student_grades
+            ungraded = self.student_ungraded
+            absent = self.absent_students
             remaining = len(self.session_students)
-            roster_total = len(grades) + remaining
+            roster_total = len(grades) + len(ungraded) + len(absent) + remaining
 
         def on_escape(event=None):
             try:
@@ -1468,6 +1950,12 @@ class InvisibleHandApp:
         counts = {rating: 0 for rating in ("A*", "A", "B", "C")}
         for rating in grades.values():
             counts[rating] = counts.get(rating, 0) + 1
+        metrics = {
+            "remaining": remaining,
+            "graded": len(grades),
+            "ungraded": len(ungraded),
+            "absent": len(absent),
+        }
 
         outer = tk.Frame(win, bg=p["bg"], padx=self.fs(24), pady=self.fs(24))
         outer.pack(fill="both", expand=True)
@@ -1480,7 +1968,7 @@ class InvisibleHandApp:
         tk.Label(header, text=class_name, font=self.hf(24, "bold"), bg=p["bg"], fg=p["text_light"]).grid(row=0, column=0, sticky="w")
         tk.Label(
             header,
-            text=f"{len(grades)} graded | {remaining} left" if roster_total else "No class session yet",
+            text=self._format_metrics_summary(metrics) if roster_total else "No class session yet",
             font=self.f(13),
             bg=p["bg"],
             fg=p["text_muted"],
@@ -1488,12 +1976,24 @@ class InvisibleHandApp:
 
         chip_row = tk.Frame(header, bg=p["bg"])
         chip_row.grid(row=0, column=1, rowspan=2, sticky="e", padx=(self.fs(18), 0))
-        for idx, rating in enumerate(("A*", "A", "B", "C")):
-            meta = self._rating_meta(rating)
+        chip_data = [
+            ("A*", counts.get("A*", 0), self._rating_meta("A*")["bg"]),
+            ("A", counts.get("A", 0), self._rating_meta("A")["bg"]),
+            ("B", counts.get("B", 0), self._rating_meta("B")["bg"]),
+            ("C", counts.get("C", 0), self._rating_meta("C")["bg"]),
+            ("No Grade", len(ungraded), p["text_dark"]),
+            ("Absent", len(absent), p["danger"]),
+        ]
+        for idx, (label, value, accent) in enumerate(chip_data):
             chip = tk.Frame(chip_row, bg=p["panel_alt"], padx=self.fs(12), pady=self.fs(10))
-            chip.grid(row=0, column=idx, padx=(0 if idx == 0 else self.fs(8), 0))
-            tk.Label(chip, text=rating, font=self.hf(16, "bold"), bg=p["panel_alt"], fg=meta["bg"]).pack(anchor="center")
-            tk.Label(chip, text=str(counts.get(rating, 0)), font=self.f(13, "bold"), bg=p["panel_alt"], fg=p["text_light"]).pack(anchor="center", pady=(self.fs(4), 0))
+            chip.grid(
+                row=idx // 3,
+                column=idx % 3,
+                padx=(0 if idx % 3 == 0 else self.fs(8), 0),
+                pady=(0 if idx < 3 else self.fs(8), 0),
+            )
+            tk.Label(chip, text=label, font=self.hf(16, "bold"), bg=p["panel_alt"], fg=accent).pack(anchor="center")
+            tk.Label(chip, text=str(value), font=self.f(13, "bold"), bg=p["panel_alt"], fg=p["text_light"]).pack(anchor="center", pady=(self.fs(4), 0))
 
         body = tk.Frame(outer, bg=p["panel"], padx=self.fs(18), pady=self.fs(18))
         body.grid(row=1, column=0, sticky="nsew", pady=(0, self.fs(16)))
@@ -1505,10 +2005,10 @@ class InvisibleHandApp:
         list_shell.grid_columnconfigure(0, weight=1)
         list_shell.grid_rowconfigure(0, weight=1)
 
-        if not grades:
+        if not (grades or ungraded or absent):
             empty = tk.Frame(list_shell, bg=p["bg_alt"], padx=self.fs(24), pady=self.fs(24))
             empty.grid(row=0, column=0, sticky="nsew")
-            tk.Label(empty, text="No ratings recorded yet.", font=self.hf(20, "bold"), bg=p["bg_alt"], fg=p["text_light"]).pack(anchor="center", pady=(self.fs(24), 0))
+            tk.Label(empty, text="No session records yet.", font=self.hf(20, "bold"), bg=p["bg_alt"], fg=p["text_light"]).pack(anchor="center", pady=(self.fs(24), 0))
         else:
             canvas = tk.Canvas(list_shell, bg=p["bg_alt"], highlightthickness=0, bd=0)
             canvas.grid(row=0, column=0, sticky="nsew")
@@ -1528,8 +2028,16 @@ class InvisibleHandApp:
             rows.bind("<Configure>", _sync_rows)
             canvas.bind("<Configure>", _stretch_rows)
 
-            for idx, (student, rating) in enumerate(grades.items(), start=1):
-                meta = self._rating_meta(rating)
+            row_number = 1
+
+            def add_section(title: str):
+                section = tk.Frame(rows, bg=p["bg_alt"], padx=self.fs(14), pady=self.fs(12))
+                section.pack(fill="x", expand=True)
+                tk.Label(section, text=title, font=self.hf(14, "bold"), bg=p["bg_alt"], fg=p["accent_alt"], anchor="w").pack(anchor="w")
+
+            def add_row(student: str, pill_text: str, pill_bg: str, pill_fg: str):
+                nonlocal row_number
+                idx = row_number
                 row_bg = p["panel"] if idx % 2 else p["panel_alt"]
                 row = tk.Frame(rows, bg=row_bg, padx=self.fs(14), pady=self.fs(12))
                 row.pack(fill="x", expand=True)
@@ -1540,14 +2048,31 @@ class InvisibleHandApp:
 
                 pill = tk.Label(
                     row,
-                    text=f"{rating}  {meta['label']}",
+                    text=pill_text,
                     font=self.hf(12, "bold"),
-                    bg=meta["bg"],
-                    fg=meta["fg"],
+                    bg=pill_bg,
+                    fg=pill_fg,
                     padx=self.fs(10),
                     pady=self.fs(5),
                 )
                 pill.grid(row=0, column=2, sticky="e")
+                row_number += 1
+
+            if grades:
+                add_section("Grades")
+                for student, rating in grades.items():
+                    meta = self._rating_meta(rating)
+                    add_row(student, f"{rating}  {meta['label']}", meta["bg"], meta["fg"])
+
+            if ungraded:
+                add_section("No Grade")
+                for student in ungraded:
+                    add_row(student, "No Grade", p["bg_alt"], p["text_dark"])
+
+            if absent:
+                add_section("Absent")
+                for student in absent:
+                    add_row(student, "Absent", p["danger"], "#fff6ef")
 
         btns = tk.Frame(outer, bg=p["bg"])
         btns.grid(row=2, column=0, sticky="ew")
@@ -1579,6 +2104,7 @@ class InvisibleHandApp:
 
 
 def main():
+    enable_windows_high_dpi()
     style = Style(theme=THEME)
     root = style.master
     _ = InvisibleHandApp(root, style)
