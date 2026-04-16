@@ -1,4 +1,4 @@
-import os
+﻿import os
 import csv
 import random
 import time
@@ -1131,17 +1131,36 @@ class InvisibleHandApp:
 
         controls = tk.Frame(panel, bg=p["panel"])
         controls.grid(row=6, column=0, sticky="ew", pady=(0, d(8)))
-        for col in range(3):
+        # Use two columns so labels can display fully: top row for attendance/summary,
+        # bottom row for sound controls.
+        for col in range(2):
             controls.grid_columnconfigure(col, weight=1, uniform="ctrl")
-        ttk.Button(controls, text="Play Intro", style="Utility.TButton", command=self._play_intro).grid(
-            row=0, column=0, sticky="ew", padx=(0, card_gap), ipady=d(4)
-        )
-        ttk.Button(controls, text="View Summary", style="Utility.TButton", command=self._show_grades_summary).grid(
-            row=0, column=1, sticky="ew", padx=card_gap, ipady=d(4)
-        )
-        ttk.Button(controls, text="Play Closing", style="Utility.TButton", command=self._play_closing).grid(
-            row=0, column=2, sticky="ew", padx=(card_gap, 0), ipady=d(4)
-        )
+        # First row: attendance and summary
+        ttk.Button(
+            controls,
+            text="Attendance",
+            style="Utility.TButton",
+            command=self._take_attendance_sequential,
+        ).grid(row=0, column=0, sticky="ew", padx=(0, card_gap), ipady=d(4))
+        ttk.Button(
+            controls,
+            text="View Summary",
+            style="Utility.TButton",
+            command=self._show_grades_summary,
+        ).grid(row=0, column=1, sticky="ew", padx=(card_gap, 0), ipady=d(4))
+        # Second row: sound controls (add vertical spacing above this row)
+        ttk.Button(
+            controls,
+            text="Play Intro",
+            style="Utility.TButton",
+            command=self._play_intro,
+        ).grid(row=1, column=0, sticky="ew", padx=(0, card_gap), ipady=d(4), pady=(d(6), 0))
+        ttk.Button(
+            controls,
+            text="Play Closing",
+            style="Utility.TButton",
+            command=self._play_closing,
+        ).grid(row=1, column=1, sticky="ew", padx=(card_gap, 0), ipady=d(4), pady=(d(6), 0))
 
         ttk.Button(
             panel,
@@ -1163,6 +1182,268 @@ class InvisibleHandApp:
     def _play_closing(self):
         self.exit_requested = False
         self.sound.play_music_once(CLOSING_MUSIC)
+
+    def _show_attendance_dialog(self):
+        selected = (self.selected_class.get() or "").strip()
+        if selected == "Select a Class" or selected not in self.classes:
+            Messagebox.show_error(title="Error", message="Please select a valid class before taking attendance.")
+            return
+
+        class_name = selected
+        roster = list(self.classes.get(class_name, []))
+
+        win = ttk.Toplevel(self.root)
+        win.title(f"{class_name} - Attendance")
+        win.attributes("-topmost", True)
+        win.geometry(f"{self.fs(560)}x{self.fs(520)}+{self.fs(40)}+{self.fs(80)}")
+        win.configure(bg=self.palette["bg"])
+
+        p = self.palette
+
+        outer = tk.Frame(win, bg=p["bg"], padx=self.fs(12), pady=self.fs(12))
+        outer.pack(fill="both", expand=True)
+        outer.grid_columnconfigure(0, weight=1)
+
+        tk.Label(outer, text=f"Mark absent students for {class_name}", font=self.hf(16, "bold"), bg=p["bg"], fg=p["text_light"]).pack(anchor="w", pady=(0, self.fs(8)))
+
+        # Scrollable area for student checkboxes
+        list_frame = tk.Frame(outer, bg=p["panel"], padx=self.fs(8), pady=self.fs(8))
+        list_frame.pack(fill="both", expand=True)
+
+        canvas = tk.Canvas(list_frame, bg=p["panel"], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=canvas.yview)
+        scrollable = tk.Frame(canvas, bg=p["panel"])
+
+        scrollable.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas.create_window((0, 0), window=scrollable, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        vars_by_student: dict[str, tk.IntVar] = {}
+        pre_absent = set(self.absent_students_by_class.get(class_name, []))
+        for name in roster:
+            var = tk.IntVar(value=1 if name in pre_absent else 0)
+            # Use a flat, indicatorless checkbutton so no white checkbox shows
+            chk = tk.Checkbutton(
+                scrollable,
+                text=name,
+                variable=var,
+                bg=p["panel"],
+                fg=p["text_light"],
+                activebackground=p["panel"],
+                selectcolor=p["panel"],
+                anchor="w",
+                bd=0,
+                relief="flat",
+                highlightthickness=0,
+                indicatoron=False,
+                activeforeground=p["text_light"],
+            )
+            chk.pack(fill="x", padx=self.fs(6), pady=self.fs(2))
+            vars_by_student[name] = var
+
+        btns = tk.Frame(outer, bg=p["bg"])
+        btns.pack(fill="x", pady=(self.fs(8), 0))
+        btns.grid_columnconfigure(0, weight=1)
+        btns.grid_columnconfigure(1, weight=1)
+
+        def save():
+            absent = [n for n, v in vars_by_student.items() if v.get()]
+            self.absent_students_by_class.setdefault(class_name, [])
+            self.absent_students_by_class[class_name] = absent
+
+            # If a session roster exists, remove absent students immediately
+            if class_name in self.session_students_by_class:
+                current = [s for s in self.session_students_by_class[class_name] if s not in absent]
+                self.session_students_by_class[class_name] = current
+
+            win.destroy()
+            self._build_main_screen()
+
+        def cancel():
+            win.destroy()
+
+        ttk.Button(btns, text="Save", style="PrimaryAction.TButton", command=save).grid(row=0, column=0, sticky="ew", padx=(0, self.fs(8)))
+        ttk.Button(btns, text="Cancel", style="Utility.TButton", command=cancel).grid(row=0, column=1, sticky="ew")
+
+    def _take_attendance_sequential(self):
+        selected = (self.selected_class.get() or "").strip()
+        if selected == "Select a Class" or selected not in self.classes:
+            Messagebox.show_error(title="Error", message="Please select a valid class before taking attendance.")
+            return
+
+        class_name = selected
+        roster = list(self.classes.get(class_name, []))
+        if not roster:
+            Messagebox.show_info(title="No Students", message="This class has no students in the roster.")
+            return
+
+        win = ttk.Toplevel(self.root)
+        win.title(f"{class_name} - Roll Call")
+        win.attributes("-topmost", True)
+        win.geometry(f"{self.fs(720)}x{self.fs(420)}+{self.fs(40)}+{self.fs(80)}")
+        win.configure(bg=self.palette["bg"])
+
+        p = self.palette
+
+        # State
+        idx = 0
+        absent: list[str] = []
+
+        title = tk.Label(
+            win,
+            text=class_name,
+            font=self.hf(20, "bold"),
+            bg=p["bg"],
+            fg=p["text_light"],
+            bd=0,
+            relief="flat",
+            highlightthickness=0,
+        )
+        title.pack(anchor="n", pady=(self.fs(8), 0))
+
+        name_frame = tk.Frame(win, bg=p["panel"], padx=self.fs(16), pady=self.fs(16))
+        name_frame.pack(fill="both", expand=True, padx=self.fs(12), pady=self.fs(12))
+
+        name_label = tk.Label(
+            name_frame,
+            text="",
+            font=self.hf(48, "bold"),
+            bg=p["panel"],
+            fg=p["text_dark"],
+            wraplength=self.fs(680),
+            justify="center",
+            bd=0,
+            relief="flat",
+            highlightthickness=0,
+        )
+        name_label.pack(expand=True)
+
+        info_label = tk.Label(
+            win,
+            text="Press Present or Absent for each student",
+            font=self.f(12),
+            bg=p["bg"],
+            fg=p["text_muted"],
+            bd=0,
+            relief="flat",
+            highlightthickness=0,
+        )
+        info_label.pack()
+
+        btn_frame = tk.Frame(win, bg=p["bg"]) 
+        btn_frame.pack(fill="x", pady=(self.fs(8), self.fs(12)))
+        btn_frame.grid_columnconfigure(0, weight=1)
+        btn_frame.grid_columnconfigure(1, weight=1)
+
+        def _update_display():
+            nonlocal idx
+            if idx >= len(roster):
+                _finish()
+                return
+            name = roster[idx]
+            name_label.config(text=name)
+
+        def _mark_present():
+            nonlocal idx
+            idx += 1
+            _update_display()
+
+        def _mark_absent():
+            nonlocal idx
+            absent.append(roster[idx])
+            idx += 1
+            _update_display()
+
+        def _finish():
+            # Save absent list
+            self.absent_students_by_class[class_name] = absent
+
+            # Rebuild the session roster from the master class list minus absentees
+            master = list(self.classes.get(class_name, []))
+            self.session_students_by_class[class_name] = [s for s in master if s not in absent]
+
+            # Close the attendance (roll-call) window now that we're finished
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+            # Immediately refresh the main dock so counters/summary update
+            try:
+                # keep the combobox selection consistent
+                self.selected_class.set(class_name)
+                self._build_main_screen()
+                self.root.update_idletasks()
+            except Exception:
+                pass
+
+            # Show results in a copyable text area
+            res_win = ttk.Toplevel(self.root)
+            res_win.title(f"{class_name} - Absent Students")
+            res_win.attributes("-topmost", True)
+            res_win.geometry(f"{self.fs(640)}x{self.fs(420)}+{self.fs(60)}+{self.fs(100)}")
+            res_win.configure(bg=self.palette["bg"])
+
+            p2 = self.palette
+            outer = tk.Frame(res_win, bg=p2["bg"], padx=self.fs(12), pady=self.fs(12))
+            outer.pack(fill="both", expand=True)
+            tk.Label(outer, text=f"Absent students ({len(absent)})", font=self.hf(16, "bold"), bg=p2["bg"], fg=p2["text_light"]).pack(anchor="w")
+
+            # Style the text area to match the dialog (avoid default white background)
+            text = tk.Text(
+                outer,
+                height=12,
+                wrap="word",
+                bg=p2["panel"],
+                fg=p2["text_light"],
+                bd=0,
+                relief="flat",
+                highlightthickness=0,
+                insertbackground=p2["text_light"],
+                selectbackground=self._shade(p2["accent_alt"], p2["panel"], 0.3),
+            )
+            text.pack(fill="both", expand=True, pady=(self.fs(8), self.fs(8)))
+            absent_text = "\n".join(absent) if absent else "(none)"
+            text.insert("1.0", absent_text)
+            try:
+                text.configure(state="disabled")
+            except Exception:
+                pass
+
+            def _copy():
+                try:
+                    self.root.clipboard_clear()
+                    self.root.clipboard_append(absent_text)
+                    Messagebox.show_info(title="Copied", message="Absent list copied to clipboard.")
+                except Exception:
+                    Messagebox.show_error(title="Error", message="Unable to copy to clipboard.")
+
+            def _close_all():
+                try:
+                    res_win.destroy()
+                except Exception:
+                    pass
+                try:
+                    win.destroy()
+                except Exception:
+                    pass
+                self._build_main_screen()
+
+            btns = tk.Frame(outer, bg=p2["bg"]) 
+            btns.pack(fill="x")
+            ttk.Button(btns, text="Copy Absent List", style="PrimaryAction.TButton", command=_copy).pack(side="left", expand=True, fill="x", padx=(0, self.fs(8)))
+            ttk.Button(btns, text="Close", style="Utility.TButton", command=_close_all).pack(side="left", expand=True, fill="x")
+
+        ttk.Button(btn_frame, text="Present", style="Utility.TButton", command=_mark_present).grid(row=0, column=0, sticky="ew", padx=(0, self.fs(8)), ipady=self.fs(8))
+        ttk.Button(btn_frame, text="Absent", style="PrimaryAction.TButton", command=_mark_absent).grid(row=0, column=1, sticky="ew", ipady=self.fs(8))
+
+        # start
+        _update_display()
 
     # ---------- Session logic ----------
 
@@ -1189,12 +1470,18 @@ class InvisibleHandApp:
             Messagebox.show_error(title="Error", message="Please select a valid class.")
             return
 
-        if class_name not in self.session_students_by_class:
-            roster = list(self.classes[class_name])
-            if not roster:
-                Messagebox.show_error(title="Error", message=f"No students found for {class_name}.")
-                return
-            self.session_students_by_class[class_name] = roster
+        # Initialize (or reinitialize) the session roster from the master class list
+        # and always filter out students previously marked absent.
+        roster = list(self.classes.get(class_name, []))
+        if not roster:
+            Messagebox.show_error(title="Error", message=f"No students found for {class_name}.")
+            return
+
+        absent = set(self.absent_students_by_class.get(class_name, []))
+        if absent:
+            roster = [s for s in roster if s not in absent]
+
+        self.session_students_by_class[class_name] = roster
 
         if class_name not in self.student_grades_by_class:
             self.student_grades_by_class[class_name] = {}
@@ -1421,10 +1708,10 @@ class InvisibleHandApp:
         next_raw = random.choice(pool)
 
         dim = secondary
-        small_px = 19
-        big_px = 32
-        min_small_px = 15
-        min_big_px = 22
+        small_px = 21
+        big_px = 38
+        min_small_px = 16
+        min_big_px = 26
 
         t_prev = reel.create_text(cx, cy - row_h, text=_format_name(prev_raw), fill=dim, anchor="center", justify="center")
         t_cur = reel.create_text(cx, cy, text=_format_name(cur_raw), fill=fg, anchor="center", justify="center")
@@ -1806,7 +2093,7 @@ class InvisibleHandApp:
         msg_win.configure(bg=self.palette["bg"])
         p = self.palette
         metrics = self._class_metrics(class_name)
-        message_wrap = self._slot_window_size(work_area=target_work_area)[0] - self.fs(220)
+        message_wrap = self._slot_window_size(work_area=target_work_area)[0] - self.fs(160)
 
         def exit_to_main():
             self.exit_requested = True
@@ -1848,11 +2135,11 @@ class InvisibleHandApp:
 
         quote = tk.Frame(body_card, bg=p["panel"])
         quote.grid(row=0, column=0, sticky="nsew")
-        tk.Label(quote, text="“", font=self.hf(48, "bold"), bg=p["panel"], fg=p["accent"]).pack(anchor="center")
+        tk.Label(quote, text="“", font=self.hf(56, "bold"), bg=p["panel"], fg=p["accent"]).pack(anchor="center")
         tk.Label(
             quote,
             text=message,
-            font=self.f(24),
+            font=self.f(30),
             bg=p["panel"],
             fg=p["text_light"],
             wraplength=message_wrap,
@@ -1867,7 +2154,7 @@ class InvisibleHandApp:
         tk.Label(
             body_card,
             text=message,
-            font=self.f(24),
+            font=self.f(30),
             bg=p["panel"],
             fg=p["text_light"],
             wraplength=message_wrap,
