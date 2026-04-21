@@ -84,62 +84,6 @@ RATING_SOUNDS = {
     "C": resource_path(r"assets\sound_c.mp3"),
 }
 
-FEEDBACK_LABELS = [
-    "Deep Thinking",
-    "Clear Explanation",
-    "Well Supported",
-    "Creative Idea",
-    "Independent",
-    "Confident",
-    "Improving",
-    "Good Use of Vocabulary",
-    "Accurate Detail",
-    "Strong Participation",
-]
-
-FEEDBACK_LABEL_PHRASES = {
-    "Deep Thinking": "deep thinking about the question",
-    "Clear Explanation": "a clear explanation",
-    "Well Supported": "well-supported ideas",
-    "Creative Idea": "a creative idea",
-    "Independent": "independent thinking",
-    "Confident": "confidence in your answer",
-    "Improving": "real improvement",
-    "Good Use of Vocabulary": "good use of vocabulary",
-    "Accurate Detail": "accurate detail",
-    "Strong Participation": "strong participation",
-}
-
-RATING_FEEDBACK_OPENERS = {
-    "A*": [
-        "Excellent response.",
-        "That was a standout answer.",
-        "That was top-level work.",
-    ],
-    "A": [
-        "Strong response.",
-        "That was a very solid answer.",
-        "You gave a strong answer there.",
-    ],
-    "B": [
-        "That was a solid attempt.",
-        "You gave a useful answer there.",
-        "That answer had some clear strengths.",
-    ],
-    "C": [
-        "Thank you for contributing.",
-        "You made a positive start there.",
-        "Thank you for having a go.",
-    ],
-}
-
-RATING_FEEDBACK_CLOSERS = {
-    "A*": "Keep using those strengths consistently.",
-    "A": "Keep pushing those strengths and you can reach the very top level.",
-    "B": "Keep building on those strengths and aim for an even fuller answer next time.",
-    "C": "Use those strengths as your starting point and build one clear idea at a time.",
-}
-
 SHORT_MAX = 4.99
 MEDIUM_MAX = 19.99
 

@@ -11,14 +11,10 @@ from ttkbootstrap.dialogs import Messagebox
 
 from studentselector_config import (
     CLOSING_MUSIC,
-    FEEDBACK_LABEL_PHRASES,
-    FEEDBACK_LABELS,
     INTRO_MUSIC,
     MEDIUM_MAX,
     MESSAGES_CSV,
     PALETTE,
-    RATING_FEEDBACK_CLOSERS,
-    RATING_FEEDBACK_OPENERS,
     RATING_SOUNDS,
     SHORT_MAX,
     SLOT_PANEL_H,
@@ -282,10 +278,31 @@ class InvisibleHandApp:
             return self.active_class
         return None
 
+    def _effective_session_roster(self, class_name: str | None) -> list[str]:
+        if not class_name:
+            return []
+        if class_name in self.session_students_by_class:
+            return list(self.session_students_by_class[class_name])
+        roster = list(self.classes.get(class_name, []))
+        absent = set(self.absent_students_by_class.get(class_name, []))
+        if absent:
+            roster = [student for student in roster if student not in absent]
+        return roster
+
+    def _sync_live_class_state(self, class_name: str | None = None) -> None:
+        class_name = class_name or self._active_or_selected_class()
+        if not class_name or class_name not in self.classes:
+            return
+
+        self.student_grades = self.student_grades_by_class.setdefault(class_name, {})
+        self.student_ungraded = self.student_ungraded_by_class.setdefault(class_name, [])
+        self.absent_students = self.absent_students_by_class.setdefault(class_name, [])
+        self.session_students = self.session_students_by_class.get(class_name, self._effective_session_roster(class_name))
+
     def _class_metrics(self, class_name: str | None = None) -> dict[str, int | str]:
         class_name = class_name or self._active_or_selected_class()
         roster = list(self.classes.get(class_name, [])) if class_name else []
-        session_roster = self.session_students_by_class.get(class_name, roster)
+        session_roster = self._effective_session_roster(class_name)
         grades = self.student_grades_by_class.get(class_name, {})
         ungraded = self.student_ungraded_by_class.get(class_name, [])
         absent = self.absent_students_by_class.get(class_name, [])
@@ -314,23 +331,6 @@ class InvisibleHandApp:
             "C": {"label": "Needs support", "bg": self.palette["danger"], "fg": "#371814"},
         }
         return meta.get(rating, {"label": "Recorded", "bg": self.palette["panel_alt"], "fg": self.palette["text_light"]})
-
-    def _natural_join(self, items: list[str]) -> str:
-        if not items:
-            return ""
-        if len(items) == 1:
-            return items[0]
-        if len(items) == 2:
-            return f"{items[0]} and {items[1]}"
-        return f"{', '.join(items[:-1])}, and {items[-1]}"
-
-    def _build_feedback_message(self, student_name: str, rating: str, labels: list[str]) -> str:
-        ordered_labels = [label for label in FEEDBACK_LABELS if label in labels]
-        label_phrases = [FEEDBACK_LABEL_PHRASES.get(label, label.lower()) for label in ordered_labels]
-        opener = random.choice(RATING_FEEDBACK_OPENERS.get(rating, ["Good work."]))
-        strengths = self._natural_join(label_phrases)
-        closer = RATING_FEEDBACK_CLOSERS.get(rating, "Keep going.")
-        return f"{student_name}, {opener} You showed {strengths}. {closer}"
 
     def _apply_visual_theme(self):
         p = self.palette
@@ -1059,6 +1059,7 @@ class InvisibleHandApp:
                 current = [s for s in self.session_students_by_class[class_name] if s not in absent]
                 self.session_students_by_class[class_name] = current
 
+            self._sync_live_class_state(class_name)
             win.destroy()
             self._build_main_screen()
 
@@ -1269,6 +1270,7 @@ class InvisibleHandApp:
             # Rebuild the session roster from the master class list minus absentees
             master = list(self.classes.get(class_name, []))
             self.session_students_by_class[class_name] = [s for s in master if s not in absent]
+            self._sync_live_class_state(class_name)
 
             # Close the attendance (roll-call) window now that we're finished
             try:
@@ -2127,18 +2129,12 @@ class InvisibleHandApp:
         win.configure(bg=self.palette["bg"])
         p = self.palette
 
-        class_name = self.active_class or self._active_or_selected_class() or "Current Session"
-        if self.active_class and self.active_class in self.student_grades_by_class:
-            grades = self.student_grades_by_class.get(self.active_class, {})
-            ungraded = self.student_ungraded_by_class.get(self.active_class, [])
-            absent = self.absent_students_by_class.get(self.active_class, [])
-            remaining = len(self.session_students_by_class.get(self.active_class, []))
-            roster_total = len(self.classes.get(self.active_class, []))
-        elif class_name in self.student_grades_by_class:
+        class_name = self._active_or_selected_class() or self.active_class or "Current Session"
+        if class_name in self.classes:
             grades = self.student_grades_by_class.get(class_name, {})
             ungraded = self.student_ungraded_by_class.get(class_name, [])
             absent = self.absent_students_by_class.get(class_name, [])
-            remaining = len(self.session_students_by_class.get(class_name, self.classes.get(class_name, [])))
+            remaining = len(self._effective_session_roster(class_name))
             roster_total = len(self.classes.get(class_name, []))
         else:
             grades = self.student_grades
