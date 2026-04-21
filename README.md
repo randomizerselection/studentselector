@@ -4,6 +4,10 @@
 
 It is built with Tkinter + `ttkbootstrap` and is currently optimized for Windows classroom use, including high-DPI displays and multi-monitor setups.
 
+## Screenshot
+
+![Random Student Selector main screen](assets/main-screen.png)
+
 ## Pedagogical rationale
 
 This app is designed for teachers who want a practical structure for equitable classroom participation.
