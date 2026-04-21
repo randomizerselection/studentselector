@@ -857,6 +857,82 @@ class InvisibleHandApp:
         screen_h = self.root.winfo_screenheight()
         return 0, 0, screen_w, screen_h
 
+    def _monitor_work_areas(self) -> list[tuple[int, int, int, int, bool]]:
+        """
+        Returns one entry per monitor as left, top, width, height, is_primary.
+        Falls back to the primary desktop work area if monitor enumeration fails.
+        """
+        monitors: list[tuple[int, int, int, int, bool]] = []
+        try:
+            if os.name == "nt":
+                class RECT(ctypes.Structure):
+                    _fields_ = [
+                        ("left", ctypes.c_long),
+                        ("top", ctypes.c_long),
+                        ("right", ctypes.c_long),
+                        ("bottom", ctypes.c_long),
+                    ]
+
+                class MONITORINFO(ctypes.Structure):
+                    _fields_ = [
+                        ("cbSize", ctypes.c_uint),
+                        ("rcMonitor", RECT),
+                        ("rcWork", RECT),
+                        ("dwFlags", ctypes.c_uint),
+                    ]
+
+                enum_proc = ctypes.WINFUNCTYPE(
+                    ctypes.c_int,
+                    ctypes.c_void_p,
+                    ctypes.c_void_p,
+                    ctypes.POINTER(RECT),
+                    ctypes.c_longlong,
+                )
+
+                def _collect_monitor(monitor, _hdc, _rect, _lparam):
+                    info = MONITORINFO()
+                    info.cbSize = ctypes.sizeof(MONITORINFO)
+                    ok = ctypes.windll.user32.GetMonitorInfoW(monitor, ctypes.byref(info))
+                    if ok:
+                        work = info.rcWork
+                        monitors.append(
+                            (
+                                work.left,
+                                work.top,
+                                work.right - work.left,
+                                work.bottom - work.top,
+                                bool(info.dwFlags & 1),
+                            )
+                        )
+                    return 1
+
+                ctypes.windll.user32.EnumDisplayMonitors(
+                    0,
+                    0,
+                    enum_proc(_collect_monitor),
+                    0,
+                )
+        except Exception:
+            monitors = []
+
+        if monitors:
+            return monitors
+
+        left, top, width, height = self._desktop_work_area()
+        return [(left, top, width, height, True)]
+
+    def _secondary_monitor_work_area(self) -> tuple[int, int, int, int]:
+        """
+        Prefer the first non-primary monitor so attendance can be projected on
+        screen 2 while the control dock stays on screen 1.
+        """
+        monitors = self._monitor_work_areas()
+        for left, top, width, height, is_primary in monitors:
+            if not is_primary:
+                return left, top, width, height
+        left, top, width, height, _ = monitors[0]
+        return left, top, width, height
+
     def _root_window_size(self) -> tuple[int, int]:
         _, _, work_w, work_h = self._desktop_work_area()
         target_w = self.fs(WINDOW_WIDTH)
@@ -1110,7 +1186,7 @@ class InvisibleHandApp:
         toggles.grid_columnconfigure(0, weight=1, uniform="toggle")
         toggles.grid_columnconfigure(1, weight=1, uniform="toggle")
 
-        def toggle_tile(col: int, title: str, variable, command, bootstyle: str):
+        def toggle_tile(col: int, title: str, variable, command):
             tile = tk.Frame(
                 toggles,
                 bg=p["bg_alt"],
@@ -1121,13 +1197,16 @@ class InvisibleHandApp:
             text = tk.Frame(tile, bg=p["bg_alt"])
             text.pack(side="left", fill="both", expand=True)
             tk.Label(text, text=title, font=self.hf(12 if compact else 13, "bold"), bg=p["bg_alt"], fg=p["text_light"], anchor="w").pack(anchor="w")
-            try:
-                ttk.Checkbutton(tile, text="", variable=variable, command=command, bootstyle=bootstyle).pack(side="right", padx=(d(6), 0))
-            except Exception:
-                ttk.Checkbutton(tile, text="", variable=variable, command=command, bootstyle="round-toggle").pack(side="right", padx=(d(6), 0))
+            ttk.Checkbutton(
+                tile,
+                text="",
+                variable=variable,
+                command=command,
+                bootstyle="round-toggle",
+            ).pack(side="right", padx=(d(6), 0))
 
-        toggle_tile(0, "Sound", self.sound_enabled_var, self._on_sound_toggle, "success-round-toggle")
-        toggle_tile(1, "Slot Effect", self.slot_effect_enabled_var, self._on_slot_effect_toggle, "warning-round-toggle")
+        toggle_tile(0, "Sound", self.sound_enabled_var, self._on_sound_toggle)
+        toggle_tile(1, "Slot Effect", self.slot_effect_enabled_var, self._on_slot_effect_toggle)
 
         controls = tk.Frame(panel, bg=p["panel"])
         controls.grid(row=6, column=0, sticky="ew", pady=(0, d(8)))
@@ -1289,33 +1368,129 @@ class InvisibleHandApp:
         win.configure(bg=self.palette["bg"])
 
         p = self.palette
+        roster_total = len(roster)
+        target_work_left, target_work_top, target_work_w, target_work_h = self._secondary_monitor_work_area()
+        normal_w = min(target_work_w, max(self.fs(720), int(target_work_w * 0.72)))
+        normal_h = min(target_work_h, max(self.fs(420), int(target_work_h * 0.62)))
+        normal_x = target_work_left + max(0, (target_work_w - normal_w) // 2)
+        normal_y = target_work_top + max(0, (target_work_h - normal_h) // 2)
+        normal_geometry = f"{normal_w}x{normal_h}+{normal_x}+{normal_y}"
+        win.geometry(normal_geometry)
+
+        self.style.configure(
+            "AttendancePresent.TButton",
+            font=self.hf(24, "bold"),
+            foreground=p["text_dark"],
+            background=p["bg_alt"],
+            bordercolor=p["line"],
+            darkcolor=self._shade(p["bg_alt"], "#000000", 0.08),
+            lightcolor=self._shade(p["bg_alt"], "#ffffff", 0.04),
+            focusthickness=0,
+            padding=self.fs(18),
+        )
+        self.style.map("AttendancePresent.TButton", background=[("active", self._shade(p["bg_alt"], "#000000", 0.03))])
+        self.style.configure(
+            "AttendanceAbsent.TButton",
+            font=self.hf(24, "bold"),
+            foreground="#fffaf3",
+            background=p["accent"],
+            bordercolor=p["accent"],
+            darkcolor=self._shade(p["accent"], "#000000", 0.14),
+            lightcolor=self._shade(p["accent"], "#ffffff", 0.08),
+            focusthickness=0,
+            padding=self.fs(18),
+        )
+        self.style.map("AttendanceAbsent.TButton", background=[("active", self._shade(p["accent"], "#ffffff", 0.08))])
 
         # State
         idx = 0
         absent: list[str] = []
+        is_fullscreen = False
+
+        def _set_fullscreen(enabled: bool):
+            nonlocal is_fullscreen
+            enabled = bool(enabled)
+            if os.name == "nt":
+                try:
+                    win.state("normal")
+                except Exception:
+                    pass
+                try:
+                    if enabled:
+                        win.geometry(f"{target_work_w}x{target_work_h}+{target_work_left}+{target_work_top}")
+                        win.update_idletasks()
+                        win.state("zoomed")
+                    else:
+                        win.geometry(normal_geometry)
+                    is_fullscreen = enabled
+                    return
+                except Exception:
+                    pass
+
+            try:
+                win.attributes("-fullscreen", enabled)
+                is_fullscreen = enabled
+                return
+            except Exception:
+                pass
+
+            try:
+                win.state("zoomed" if enabled else "normal")
+                is_fullscreen = enabled
+            except Exception:
+                is_fullscreen = False
+
+        def _toggle_fullscreen(event=None):
+            _set_fullscreen(not is_fullscreen)
+            return "break"
+
+        def _close_window(event=None):
+            try:
+                win.destroy()
+            except Exception:
+                pass
+            return "break"
+
+        def _handle_escape(event=None):
+            if is_fullscreen:
+                _set_fullscreen(False)
+                return "break"
+            return _close_window()
 
         title = tk.Label(
             win,
             text=class_name,
-            font=self.hf(20, "bold"),
+            font=self.hf(28, "bold"),
             bg=p["bg"],
             fg=p["text_light"],
             bd=0,
             relief="flat",
             highlightthickness=0,
         )
-        title.pack(anchor="n", pady=(self.fs(8), 0))
+        title.pack(anchor="n", pady=(self.fs(20), 0))
 
-        name_frame = tk.Frame(win, bg=p["panel"], padx=self.fs(16), pady=self.fs(16))
-        name_frame.pack(fill="both", expand=True, padx=self.fs(12), pady=self.fs(12))
+        progress_label = tk.Label(
+            win,
+            text="",
+            font=self.hf(18, "bold"),
+            bg=p["bg"],
+            fg=p["accent_alt"],
+            bd=0,
+            relief="flat",
+            highlightthickness=0,
+        )
+        progress_label.pack(anchor="n", pady=(self.fs(8), 0))
+
+        name_frame = tk.Frame(win, bg=p["panel"], padx=self.fs(28), pady=self.fs(28))
+        name_frame.pack(fill="both", expand=True, padx=self.fs(24), pady=self.fs(20))
 
         name_label = tk.Label(
             name_frame,
             text="",
-            font=self.hf(48, "bold"),
+            font=self.hf(72, "bold"),
             bg=p["panel"],
             fg=p["text_dark"],
-            wraplength=self.fs(680),
+            wraplength=max(self.fs(680), target_work_w - self.fs(220)),
             justify="center",
             bd=0,
             relief="flat",
@@ -1325,18 +1500,20 @@ class InvisibleHandApp:
 
         info_label = tk.Label(
             win,
-            text="Press Present or Absent for each student",
-            font=self.f(12),
+            text="Present: Enter, Space, P, Right Arrow    Absent: A, Backspace, Left Arrow    F11: Full Screen",
+            font=self.f(16),
             bg=p["bg"],
             fg=p["text_muted"],
             bd=0,
             relief="flat",
             highlightthickness=0,
+            justify="center",
+            wraplength=max(self.fs(760), target_work_w - self.fs(180)),
         )
-        info_label.pack()
+        info_label.pack(padx=self.fs(20))
 
         btn_frame = tk.Frame(win, bg=p["bg"]) 
-        btn_frame.pack(fill="x", pady=(self.fs(8), self.fs(12)))
+        btn_frame.pack(fill="x", padx=self.fs(24), pady=(self.fs(16), self.fs(24)))
         btn_frame.grid_columnconfigure(0, weight=1)
         btn_frame.grid_columnconfigure(1, weight=1)
 
@@ -1346,18 +1523,25 @@ class InvisibleHandApp:
                 _finish()
                 return
             name = roster[idx]
+            progress_label.config(text=f"Student {idx + 1} of {roster_total}")
             name_label.config(text=name)
 
-        def _mark_present():
+        def _mark_present(event=None):
             nonlocal idx
+            if idx >= len(roster):
+                return "break"
             idx += 1
             _update_display()
+            return "break"
 
-        def _mark_absent():
+        def _mark_absent(event=None):
             nonlocal idx
+            if idx >= len(roster):
+                return "break"
             absent.append(roster[idx])
             idx += 1
             _update_display()
+            return "break"
 
         def _finish():
             # Save absent list
@@ -1386,7 +1570,11 @@ class InvisibleHandApp:
             res_win = ttk.Toplevel(self.root)
             res_win.title(f"{class_name} - Absent Students")
             res_win.attributes("-topmost", True)
-            res_win.geometry(f"{self.fs(640)}x{self.fs(420)}+{self.fs(60)}+{self.fs(100)}")
+            result_w = min(target_work_w, max(self.fs(640), int(target_work_w * 0.5)))
+            result_h = min(target_work_h, max(self.fs(420), int(target_work_h * 0.5)))
+            result_x = target_work_left + max(0, (target_work_w - result_w) // 2)
+            result_y = target_work_top + max(0, (target_work_h - result_h) // 2)
+            res_win.geometry(f"{result_w}x{result_h}+{result_x}+{result_y}")
             res_win.configure(bg=self.palette["bg"])
 
             p2 = self.palette
@@ -1438,11 +1626,25 @@ class InvisibleHandApp:
             btns.pack(fill="x")
             ttk.Button(btns, text="Copy Absent List", style="PrimaryAction.TButton", command=_copy).pack(side="left", expand=True, fill="x", padx=(0, self.fs(8)))
             ttk.Button(btns, text="Close", style="Utility.TButton", command=_close_all).pack(side="left", expand=True, fill="x")
+            self._grow_window_to_fit(res_win, min_bottom_margin=self.fs(24))
 
-        ttk.Button(btn_frame, text="Present", style="Utility.TButton", command=_mark_present).grid(row=0, column=0, sticky="ew", padx=(0, self.fs(8)), ipady=self.fs(8))
-        ttk.Button(btn_frame, text="Absent", style="PrimaryAction.TButton", command=_mark_absent).grid(row=0, column=1, sticky="ew", ipady=self.fs(8))
+        win.bind("<Escape>", _handle_escape)
+        win.bind("<F11>", _toggle_fullscreen)
+        for seq in ("<Return>", "<KP_Enter>", "<space>", "<Right>", "<p>", "<P>"):
+            win.bind(seq, _mark_present)
+        for seq in ("<BackSpace>", "<Left>", "<a>", "<A>"):
+            win.bind(seq, _mark_absent)
+        win.protocol("WM_DELETE_WINDOW", _close_window)
+
+        ttk.Button(btn_frame, text="Present", style="AttendancePresent.TButton", command=_mark_present).grid(row=0, column=0, sticky="ew", padx=(0, self.fs(10)), ipady=self.fs(12))
+        ttk.Button(btn_frame, text="Absent", style="AttendanceAbsent.TButton", command=_mark_absent).grid(row=0, column=1, sticky="ew", ipady=self.fs(12))
 
         # start
+        _set_fullscreen(True)
+        try:
+            win.focus_force()
+        except Exception:
+            pass
         _update_display()
 
     # ---------- Session logic ----------
