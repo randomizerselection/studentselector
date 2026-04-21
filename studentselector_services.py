@@ -1,5 +1,7 @@
 import csv
 import os
+import threading
+import time
 
 # -------------------------
 # Audio Manager (resilient)
@@ -16,6 +18,7 @@ class SoundManager:
         self._pygame = None
         self._mixer_ok = False
         self.enabled = True
+        self._winsound = None
 
         try:
             import pygame
@@ -25,6 +28,12 @@ class SoundManager:
         except Exception:
             self._pygame = None
             self._mixer_ok = False
+
+        try:
+            import winsound
+            self._winsound = winsound
+        except Exception:
+            self._winsound = None
 
     def set_enabled(self, enabled: bool):
         """Enable/disable all audio. Disabling stops any currently playing audio."""
@@ -82,6 +91,41 @@ class SoundManager:
                 self._pygame.mixer.music.play()
             except Exception:
                 pass
+
+    def _play_tone_pattern(self, pattern: list[tuple[int, int]], fallback_icon: str | None = None):
+        if not self.enabled or not self._winsound:
+            return
+
+        def _runner():
+            for frequency, duration_ms in pattern:
+                try:
+                    self._winsound.Beep(frequency, duration_ms)
+                except Exception:
+                    icon = getattr(self._winsound, fallback_icon, None) if fallback_icon else None
+                    if icon is not None:
+                        try:
+                            self._winsound.MessageBeep(icon)
+                        except Exception:
+                            pass
+                    break
+                time.sleep(0.015)
+
+        threading.Thread(target=_runner, daemon=True).start()
+
+    def play_attendance_present(self):
+        """Short confirmation cue for a present mark."""
+        self._play_tone_pattern([(988, 70)], fallback_icon="MB_OK")
+
+    def play_attendance_absent(self):
+        """Lower two-note cue for an absent mark."""
+        self._play_tone_pattern([(523, 90), (392, 140)], fallback_icon="MB_ICONEXCLAMATION")
+
+    def play_attendance_complete(self):
+        """Completion cue once roll call finishes."""
+        self._play_tone_pattern(
+            [(659, 80), (784, 80), (988, 120)],
+            fallback_icon="MB_ICONASTERISK",
+        )
 
 
 # -------------------------

@@ -302,6 +302,7 @@ class AppAttendanceMixin:
             nonlocal idx
             if idx >= len(roster):
                 return "break"
+            self.sound.play_attendance_present()
             idx += 1
             _update_display()
             return "break"
@@ -310,12 +311,15 @@ class AppAttendanceMixin:
             nonlocal idx
             if idx >= len(roster):
                 return "break"
+            self.sound.play_attendance_absent()
             absent.append(roster[idx])
             idx += 1
             _update_display()
             return "break"
 
         def _finish():
+            self.sound.play_attendance_complete()
+
             # Save absent list
             self.absent_students_by_class[class_name] = absent
 
