@@ -30,6 +30,7 @@ In practice, the app is meant to support cold calling in a fairer and more susta
 - Take attendance before or during a session.
 - Mark each selected student as `A*`, `A`, `B`, `C`, `No Grade`, or `Absent`.
 - Remove absent students from the active class roster for the current session.
+- Keep chosen and absent students excluded while the app remains open.
 - Show a session summary with counts and per-student outcomes.
 - Resume an active session from the summary window.
 
@@ -169,3 +170,4 @@ The included `build.bat` also builds the app using `.venv\Scripts\python.exe`.
 - The UI is designed as a small always-on-top control dock plus larger session windows.
 - The app is Windows-aware for DPI scaling and taskbar-safe window placement.
 - The selection and attendance windows are also kept on top for classroom use.
+- Closing and relaunching the whole app starts a fresh selection and attendance history.

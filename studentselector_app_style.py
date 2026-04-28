@@ -190,13 +190,31 @@ class AppStyleMixin:
     def _effective_session_roster(self, class_name: str | None) -> list[str]:
         if not class_name:
             return []
+        blocked = set(self._chosen_students_for_class(class_name))
+        blocked.update(self.absent_students_by_class.get(class_name, []))
         if class_name in self.session_students_by_class:
-            return list(self.session_students_by_class[class_name])
+            return [student for student in self.session_students_by_class[class_name] if student not in blocked]
         roster = list(self.classes.get(class_name, []))
-        absent = set(self.absent_students_by_class.get(class_name, []))
-        if absent:
-            roster = [student for student in roster if student not in absent]
-        return roster
+        return [student for student in roster if student not in blocked]
+
+    def _chosen_students_for_class(self, class_name: str | None) -> list[str]:
+        if not class_name:
+            return []
+
+        chosen: list[str] = []
+
+        def add(student: str) -> None:
+            if student and student not in chosen:
+                chosen.append(student)
+
+        for student in getattr(self, "selected_students_by_class", {}).get(class_name, []):
+            add(student)
+        for student in self.student_grades_by_class.get(class_name, {}):
+            add(student)
+        for student in self.student_ungraded_by_class.get(class_name, []):
+            add(student)
+
+        return chosen
 
     def _sync_live_class_state(self, class_name: str | None = None) -> None:
         class_name = class_name or self._active_or_selected_class()
@@ -206,10 +224,10 @@ class AppStyleMixin:
         self.student_grades = self.student_grades_by_class.setdefault(class_name, {})
         self.student_ungraded = self.student_ungraded_by_class.setdefault(class_name, [])
         self.absent_students = self.absent_students_by_class.setdefault(class_name, [])
-        self.session_students = self.session_students_by_class.get(
-            class_name,
-            self._effective_session_roster(class_name),
-        )
+        effective_roster = self._effective_session_roster(class_name)
+        if class_name in self.session_students_by_class:
+            self.session_students_by_class[class_name] = effective_roster
+        self.session_students = self.session_students_by_class.get(class_name, effective_roster)
 
     def _class_metrics(self, class_name: str | None = None) -> dict[str, int | str]:
         class_name = class_name or self._active_or_selected_class()

@@ -42,25 +42,23 @@ class AppSessionMixin:
             Messagebox.show_error(title="Error", message="Please select a valid class.")
             return
 
-        # Initialize (or reinitialize) the session roster from the master class list
-        # and always filter out students previously marked absent.
-        roster = list(self.classes.get(class_name, []))
-        if not roster:
-            Messagebox.show_error(title="Error", message=f"No students found for {class_name}.")
-            return
-
-        absent = set(self.absent_students_by_class.get(class_name, []))
-        if absent:
-            roster = [s for s in roster if s not in absent]
-
-        self.session_students_by_class[class_name] = roster
-
+        self.selected_students_by_class.setdefault(class_name, [])
         if class_name not in self.student_grades_by_class:
             self.student_grades_by_class[class_name] = {}
         if class_name not in self.student_ungraded_by_class:
             self.student_ungraded_by_class[class_name] = []
         if class_name not in self.absent_students_by_class:
             self.absent_students_by_class[class_name] = []
+
+        master_roster = list(self.classes.get(class_name, []))
+        if not master_roster:
+            Messagebox.show_error(title="Error", message=f"No students found for {class_name}.")
+            return
+
+        # Initialize (or reinitialize) from the master class list, excluding
+        # students already chosen during this app run and students marked absent.
+        roster = self._effective_session_roster(class_name)
+        self.session_students_by_class[class_name] = roster
 
         self.active_class = class_name
         self.session_students = self.session_students_by_class[class_name]
@@ -411,6 +409,8 @@ class AppSessionMixin:
 
             self.sound.stop_music()
 
+            self._remember_selected_student(class_name, final_student)
+
             if final_student in self.session_students:
                 self.session_students.remove(final_student)
             remaining_value.config(text=f"{len(self.session_students)} left")
@@ -529,6 +529,7 @@ class AppSessionMixin:
         def apply_rating(rating: str):
             _clear_non_grade_marks()
             self.student_grades[student_name] = rating
+            self._remember_selected_student(class_name, student_name)
             self.sound.play_music_once(RATING_SOUNDS.get(rating, ""))
 
             msg_list = self.messages.get(rating) or []
@@ -555,6 +556,7 @@ class AppSessionMixin:
                 absent_students.remove(student_name)
             if student_name not in ungraded_students:
                 ungraded_students.append(student_name)
+            self._remember_selected_student(class_name, student_name)
             anchor_rect = self._capture_window_rect(win)
             anchor_work_area = self._monitor_work_area_for_window(win)
 
@@ -577,6 +579,7 @@ class AppSessionMixin:
                 ungraded_students.remove(student_name)
             if student_name not in absent_students:
                 absent_students.append(student_name)
+            self._remember_selected_student(class_name, student_name)
             anchor_rect = self._capture_window_rect(win)
             anchor_work_area = self._monitor_work_area_for_window(win)
 

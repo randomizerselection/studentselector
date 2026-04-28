@@ -64,6 +64,7 @@ class InvisibleHandApp(
         self.slot_effect_enabled_var = tk.BooleanVar(value=True)
 
         self.session_students_by_class: dict[str, list[str]] = {}
+        self.selected_students_by_class: dict[str, list[str]] = {}
         self.student_grades_by_class: dict[str, dict[str, str]] = {}
         self.student_ungraded_by_class: dict[str, list[str]] = {}
         self.absent_students_by_class: dict[str, list[str]] = {}
@@ -79,3 +80,11 @@ class InvisibleHandApp(
 
         # UI
         self._build_main_screen()
+
+    def _remember_selected_student(self, class_name: str, student_name: str) -> None:
+        if class_name not in self.classes or student_name not in self.classes[class_name]:
+            return
+
+        selected_students = self.selected_students_by_class.setdefault(class_name, [])
+        if student_name not in selected_students:
+            selected_students.append(student_name)

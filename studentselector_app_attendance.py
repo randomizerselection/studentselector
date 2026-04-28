@@ -90,7 +90,12 @@ class AppAttendanceMixin:
 
             # If a session roster exists, remove absent students immediately
             if class_name in self.session_students_by_class:
-                current = [s for s in self.session_students_by_class[class_name] if s not in absent]
+                chosen = set(self._chosen_students_for_class(class_name))
+                current = [
+                    s
+                    for s in self.session_students_by_class[class_name]
+                    if s not in absent and s not in chosen
+                ]
                 self.session_students_by_class[class_name] = current
 
             self._sync_live_class_state(class_name)
@@ -324,8 +329,12 @@ class AppAttendanceMixin:
             self.absent_students_by_class[class_name] = absent
 
             # Rebuild the session roster from the master class list minus absentees
+            # and students already chosen during this app run.
             master = list(self.classes.get(class_name, []))
-            self.session_students_by_class[class_name] = [s for s in master if s not in absent]
+            chosen = set(self._chosen_students_for_class(class_name))
+            self.session_students_by_class[class_name] = [
+                s for s in master if s not in absent and s not in chosen
+            ]
             self._sync_live_class_state(class_name)
 
             # Close the attendance (roll-call) window now that we're finished
