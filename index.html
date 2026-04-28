@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="Random Student Selector is a Windows classroom app for fair participation, attendance, timed responses, and lightweight session summaries."
+    >
+    <meta name="theme-color" content="#15211e">
+    <title>Random Student Selector</title>
+    <link rel="icon" href="assets/icon.png">
+    <link rel="stylesheet" href="landing.css">
+  </head>
+  <body>
+    <header class="site-header" data-site-header>
+      <a class="brand" href="#top" aria-label="Random Student Selector home">
+        <img src="assets/icon.png" alt="" width="34" height="34">
+        <span>Random Student Selector</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a href="#workflow">Workflow</a>
+        <a href="#features">Features</a>
+        <a href="#setup">Setup</a>
+        <a class="nav-cta" href="https://github.com/randomizerselection/studentselector">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-backdrop" aria-hidden="true">
+          <img src="assets/main-screen.png" alt="">
+        </div>
+        <div class="hero-overlay" aria-hidden="true"></div>
+        <div class="hero-content">
+          <p class="eyebrow">Windows classroom utility</p>
+          <h1 id="hero-title">Random Student Selector</h1>
+          <p class="hero-copy">
+            A polished teacher dock for equitable cold calling, live attendance,
+            timed wait time, quick participation outcomes, and instant session
+            summaries.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="https://github.com/randomizerselection/studentselector">View on GitHub</a>
+            <a class="button secondary" href="#setup">Run locally</a>
+          </div>
+          <dl class="hero-metrics" aria-label="Product highlights">
+            <div>
+              <dt>Live roster</dt>
+              <dd>Attendance-aware selection</dd>
+            </div>
+            <div>
+              <dt>Timed</dt>
+              <dd>5 sec to 2 min prompts</dd>
+            </div>
+            <div>
+              <dt>Summary</dt>
+              <dd>Grades, absences, follow-up cues</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="intro-band" aria-label="Product positioning">
+        <div class="section-inner intro-grid">
+          <div>
+            <p class="section-kicker">Built for live lessons</p>
+            <h2>Structure participation without slowing the room down.</h2>
+          </div>
+          <p>
+            Random Student Selector links the classroom routines teachers already
+            run: who is present, who gets called, how long they have to think,
+            what happened, and who may need follow-up after class.
+          </p>
+        </div>
+      </section>
+
+      <section class="workflow-section" id="workflow" aria-labelledby="workflow-title">
+        <div class="section-inner">
+          <div class="section-heading">
+            <p class="section-kicker">Classroom flow</p>
+            <h2 id="workflow-title">From roster to recap in one lesson rhythm.</h2>
+          </div>
+          <div class="timeline" aria-label="Typical classroom workflow">
+            <article>
+              <span>01</span>
+              <h3>Pick the active class</h3>
+              <p>Load the current roster and keep absent students out of the live selection pool.</p>
+            </article>
+            <article>
+              <span>02</span>
+              <h3>Set the response window</h3>
+              <p>Choose a preset timer and use the optional reel effect to make the selection visible.</p>
+            </article>
+            <article>
+              <span>03</span>
+              <h3>Capture the outcome</h3>
+              <p>Record A*, A, B, C, No Grade, or Absent as soon as the response finishes.</p>
+            </article>
+            <article>
+              <span>04</span>
+              <h3>Review the session</h3>
+              <p>See remaining students, participation results, absences, and grade-band counts.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="showcase-section" aria-labelledby="showcase-title">
+        <div class="section-inner showcase-grid">
+          <div class="screen-frame">
+            <img src="assets/main-screen.png" alt="Random Student Selector main classroom dock">
+          </div>
+          <div class="showcase-copy">
+            <p class="section-kicker">Teacher-facing interface</p>
+            <h2 id="showcase-title">A compact control dock with the whole lesson state in view.</h2>
+            <p>
+              The interface is designed for repeated use during class: large controls,
+              clear counts, immediate attendance access, optional sound, and a single
+              high-confidence action to start the next selection.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="feature-section" id="features" aria-labelledby="features-title">
+        <div class="section-inner">
+          <div class="section-heading">
+            <p class="section-kicker">Feature set</p>
+            <h2 id="features-title">Everything needed for fair, low-friction participation.</h2>
+          </div>
+          <div class="feature-grid">
+            <article>
+              <h3>Attendance-aware roster</h3>
+              <p>Roll call removes absent students from the active session so selection stays credible.</p>
+            </article>
+            <article>
+              <h3>Visible wait time</h3>
+              <p>Timer presets create a response window that gives students a reason to prepare.</p>
+            </article>
+            <article>
+              <h3>Quick formative outcomes</h3>
+              <p>Record contribution quality in the moment without turning discussion into data entry.</p>
+            </article>
+            <article>
+              <h3>Session memory</h3>
+              <p>Chosen and absent students stay excluded while the app remains open.</p>
+            </article>
+            <article>
+              <h3>Classroom-ready audio</h3>
+              <p>Optional intro, closing, slot, timer, and rating cues can be toggled from the dock.</p>
+            </article>
+            <article>
+              <h3>Windows-aware layout</h3>
+              <p>High-DPI and multi-monitor handling keep the app usable on real classroom setups.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="setup-section" id="setup" aria-labelledby="setup-title">
+        <div class="section-inner setup-grid">
+          <div>
+            <p class="section-kicker">Local setup</p>
+            <h2 id="setup-title">Run from source or package with PyInstaller.</h2>
+            <p>
+              The app uses Python, Tkinter, ttkbootstrap, and optional pygame audio.
+              Class data stays local in an ignored CSV file.
+            </p>
+          </div>
+          <div class="command-panel" aria-label="Setup commands">
+            <div>
+              <span>Install</span>
+              <code>pip install ttkbootstrap pygame</code>
+            </div>
+            <div>
+              <span>Run</span>
+              <code>python studentselector.py</code>
+            </div>
+            <div>
+              <span>Package</span>
+              <code>pyinstaller --noconfirm studentselector.spec</code>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="section-inner footer-inner">
+        <p>Random Student Selector</p>
+        <a href="https://github.com/randomizerselection/studentselector">GitHub repository</a>
+      </div>
+    </footer>
+
+    <script src="landing.js"></script>
+  </body>
+</html>
