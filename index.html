@@ -9,6 +9,12 @@
     >
     <meta name="theme-color" content="#15211e">
     <title>Random Student Selector</title>
+    <meta property="og:title" content="Random Student Selector">
+    <meta
+      property="og:description"
+      content="An Active Learning-informed classroom app for equitable participation, attendance, timed wait time, and lesson summaries."
+    >
+    <meta property="og:image" content="https://randomizerselection.github.io/studentselector/assets/main-screen.png">
     <link rel="icon" href="assets/icon.png">
     <link rel="stylesheet" href="landing.css">
   </head>
@@ -63,6 +69,12 @@
             Developed by Samuel Oehler-Huang at Suzhou Foreign Language School.
           </p>
         </div>
+        <div class="hero-signal" aria-label="Active Learning loop">
+          <span>Think</span>
+          <span>Prepare</span>
+          <span>Respond</span>
+          <span>Reflect</span>
+        </div>
       </section>
 
       <section class="intro-band" aria-label="Product positioning">
@@ -93,6 +105,12 @@
               students remain in the loop, and the teacher can respond to what
               happens in the moment.
             </p>
+            <div class="learning-loop" aria-label="Learning routine">
+              <span>Prompt</span>
+              <span>Wait</span>
+              <span>Explain</span>
+              <span>Record</span>
+            </div>
           </div>
           <div class="theory-panel" aria-label="Active Learning principles">
             <article>
@@ -209,7 +227,6 @@
             <h2 id="setup-title">Run from source or package with PyInstaller.</h2>
             <p>
               The app uses Python, Tkinter, ttkbootstrap, and optional pygame audio.
-              Class data stays local in an ignored CSV file.
             </p>
           </div>
           <div class="command-panel" aria-label="Setup commands">
