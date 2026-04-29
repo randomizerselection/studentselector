@@ -1,40 +1,44 @@
 # Random Student Selector
 
-`Random Student Selector` is a classroom desktop app for running attendance, randomly selecting students, recording quick outcomes, and keeping a lightweight session summary for each class.
+`Random Student Selector` is a Windows classroom app for running attendance-aware questioning, timed thinking, random student selection, quick formative outcomes, and live lesson summaries.
 
-The software was developed by Samuel Oehler-Huang at Suzhou Foreign Language School to enhance student engagement through structured, equitable participation. Its classroom design is informed by Active Learning theory: students are asked to think, prepare, respond, and receive feedback during the lesson rather than remaining passive listeners.
+It was developed by Samuel Oehler-Huang at Suzhou Foreign Language School for practical Cambridge classroom use. The app is not intended to make questioning random for its own sake. It gives teachers a simple routine for involving more learners, making thinking time visible, collecting informal evidence, and reflecting on who may need follow-up.
 
-It is built with Tkinter + `ttkbootstrap` and is currently optimized for Windows classroom use, including high-DPI displays and multi-monitor setups.
+The app is built with Tkinter + `ttkbootstrap` and is optimized for Windows classroom setups, including high-DPI displays and multi-monitor use.
 
 ## Screenshot
 
 ![Random Student Selector main screen](assets/main-screen.png)
 
-## Pedagogical rationale
+## Pedagogical position
 
-This app is designed for teachers who want a practical structure for equitable classroom participation and a stronger culture of active student engagement.
+This software aligns best with Cambridge teaching when it is used as part of a planned questioning and feedback routine.
 
-Active Learning emphasizes the role of the learner as an active participant in the lesson. In this context, the app supports that goal by making participation expected, distributed, visible, and followed by immediate feedback. It does not replace teacher judgment or classroom relationships; it gives the teacher a lightweight structure for turning participation into a regular learning routine.
+Cambridge's guidance on teaching programmes emphasizes effective questioning, effective use of assessment, checking understanding repeatedly, scaffolding new learning, modelling good thinking, and adjusting teaching in response to evidence from learners. The related Cambridge professional development materials frame active learning as students thinking hard rather than passively receiving information, assessment for learning as feedback used to improve performance, and metacognition as learners planning, monitoring, evaluating, and changing their learning behaviours.
 
-- Random selection reduces the tendency to rely on the same volunteers and helps spread participation across the full class.
-- A visible countdown creates productive wait time: students know a response is coming, so they have a reason to think, rehearse, and stay engaged.
-- Attendance and selection are linked, which keeps the active roster accurate and avoids repeatedly calling absent students.
-- Quick outcome buttons make it easy to capture low-stakes formative information in the moment without turning participation into heavy data entry.
-- The summary view gives the teacher a lightweight record of who contributed, who was absent, and who may need follow-up support.
+Random Student Selector supports those aims in a narrow but useful way:
 
-In practice, the app is meant to support cold calling in a fairer and more sustainable way: high enough structure to improve participation, but light enough to use during a live lesson. The goal is not randomization for its own sake. The goal is to normalize active retrieval, explanation, accountability, and reflection across the whole class.
+- **Active learning:** every present learner remains part of the lesson conversation, not only the quickest volunteers.
+- **Assessment for learning:** quick outcomes and notes from questioning give the teacher informal evidence for reteaching, extension, or targeted support.
+- **Metacognition:** the summary can feed a short reflection routine: What did I understand? What strategy helped? What should I do next?
+- **Differentiation:** attendance, selection history, and outcome patterns help the teacher notice who has not contributed, who needs support, and who may be ready for challenge.
+- **Reflective practice:** the session record gives the teacher a small evidence base for reviewing what worked and planning the next lesson.
 
-The design aligns with several practical Active Learning principles:
+The app does not replace strong lesson planning, success criteria, teacher judgement, peer discussion, written work, or rich feedback. It is a classroom control tool for one recurring part of effective teaching: structured whole-class questioning with enough evidence to respond intelligently.
 
-- **Equitable participation:** every present student remains part of the learning loop, not only the quickest volunteers.
-- **Retrieval and explanation:** students are prompted to recall, organize, and express understanding aloud.
-- **Productive wait time:** the countdown gives students a visible preparation window before responding.
-- **Low-stakes formative assessment:** quick outcomes help the teacher notice patterns without interrupting lesson pace.
-- **Responsive teaching:** the session summary gives the teacher evidence for follow-up, reteaching, or encouragement.
+## A Cambridge-aligned classroom routine
 
-## Development context
+A useful pattern is:
 
-Random Student Selector was developed by Samuel Oehler-Huang at Suzhou Foreign Language School. It was created for practical classroom use, with a particular focus on increasing student engagement and supporting Active Learning routines in live lessons.
+1. **Plan the question.** Choose a question that fits the learning objective and success criteria.
+2. **Give thinking time.** Use the timer before taking answers so more learners can prepare.
+3. **Select fairly.** Randomly select from the present roster to widen participation.
+4. **Probe understanding.** Ask follow-up questions such as "Why?", "How do you know?", or "Can you build on that?"
+5. **Record the response.** Mark a quick outcome without turning discussion into heavy data entry.
+6. **Adapt the lesson.** Use the emerging pattern to decide whether to reteach, extend, pair students, or move on.
+7. **Reflect.** Use the summary to prompt teacher reflection or a brief learner reflection.
+
+This routine is especially useful for cold calling, retrieval practice, checking understanding after teacher explanation, reviewing previous learning, and making whole-class discussion more inclusive.
 
 ## Current functionality
 
@@ -56,17 +60,19 @@ Random Student Selector was developed by Samuel Oehler-Huang at Suzhou Foreign L
 2. Select a class.
 3. Optionally click `Attendance` to run roll call.
 4. Choose a timer preset.
-5. Click `START SELECTION`.
-6. When the selected student appears, choose one outcome:
+5. Ask the class a question and give silent thinking time.
+6. Click `START SELECTION`.
+7. When the selected student appears, listen to the response and probe as needed.
+8. Choose one outcome:
    - `A*`, `A`, `B`, `C`
    - `No Grade`
    - `Absent`
-7. Read the feedback popup, then either continue with `Next Student` or return to the main dock.
-8. Open `View Summary` at any time to review the live session state.
+9. Continue with `Next Student` or return to the main dock.
+10. Open `View Summary` to review participation, absences, and outcome patterns.
 
 ## Attendance mode
 
-The current app includes a sequential roll-call mode.
+The app includes a sequential roll-call mode.
 
 - Attendance prefers a secondary monitor when one is available.
 - The roll-call window opens full screen by default.
@@ -91,6 +97,8 @@ Each selected student can be recorded as one of these outcomes:
 
 After a graded outcome, the app shows a feedback message chosen from `assets/messages.csv`.
 
+For stronger assessment-for-learning use, treat these outcomes as quick teacher evidence rather than final attainment data. The most important follow-up is the instructional decision: clarify a misconception, ask another learner to build on the response, revisit success criteria, or note a student for later support.
+
 The summary window tracks:
 
 - remaining students
@@ -101,7 +109,7 @@ The summary window tracks:
 
 ## Required data files
 
-The app expects these CSV files in `assets/`:
+The app expects these CSV files in `assets/`.
 
 ### `assets/students.csv`
 
@@ -141,6 +149,7 @@ Notes:
 - The file uses `Rating` and `Message` columns.
 - Multiple messages per rating are supported.
 - Messages are chosen at random from the matching rating bucket.
+- Messages work best when they are task-focused and improvement-oriented.
 
 ## Audio behavior
 
@@ -180,6 +189,15 @@ pyinstaller --noconfirm studentselector.spec
 ```
 
 The included `build.bat` also builds the app using `.venv\Scripts\python.exe`.
+
+## Source framing
+
+The README and landing page were rewritten around these Cambridge materials:
+
+- Cambridge International Education, *Teaching Cambridge Programmes* section from `Teaching Cambridge Programmes.pdf`.
+- [Getting started with Active Learning](https://www.cambridge-community.org.uk/professional-development/gswal/index.html)
+- [Getting started with Assessment for Learning](https://cambridge-community.org.uk/professional-development/gswafl/index.html)
+- [Getting started with Metacognition](https://cambridge-community.org.uk/professional-development/gswmeta/index.html)
 
 ## Notes
 

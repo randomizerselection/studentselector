@@ -523,6 +523,20 @@ h3 {
   margin-bottom: 0;
 }
 
+.feature-grid a {
+  color: var(--copper-dark);
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.feature-grid a:hover,
+.feature-grid a:focus-visible {
+  color: var(--ink);
+  outline: none;
+}
+
 .showcase-section {
   background:
     linear-gradient(90deg, rgba(70, 105, 94, 0.22), transparent 42%),
