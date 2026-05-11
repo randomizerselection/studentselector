@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta
       name="description"
-      content="Random Student Selector is a Windows classroom app for Cambridge-aligned questioning, timed thinking, attendance-aware selection, formative outcomes, and lesson reflection."
+      content="Random Student Selector is a browser classroom app for Cambridge-aligned questioning, timed thinking, attendance-aware selection, formative outcomes, and lesson reflection."
     >
     <meta name="theme-color" content="#15211e">
     <title>Random Student Selector</title>
@@ -251,23 +251,23 @@
         <div class="section-inner setup-grid">
           <div>
             <p class="section-kicker">Local setup</p>
-            <h2 id="setup-title">Run from source or package with PyInstaller.</h2>
+            <h2 id="setup-title">Run as a static web app.</h2>
             <p>
-              The app uses Python, Tkinter, ttkbootstrap, and optional pygame audio.
+              The active app uses HTML, CSS, browser JavaScript, public CSV roster files, and optional audio assets.
             </p>
           </div>
           <div class="command-panel" aria-label="Setup commands">
             <div>
-              <span>Install</span>
-              <code>pip install ttkbootstrap pygame</code>
+              <span>Install tests</span>
+              <code>npm install</code>
             </div>
             <div>
-              <span>Run</span>
-              <code>python studentselector.py</code>
+              <span>Serve</span>
+              <code>python -m http.server 8766 --bind 127.0.0.1</code>
             </div>
             <div>
-              <span>Package</span>
-              <code>pyinstaller --noconfirm studentselector.spec</code>
+              <span>Test</span>
+              <code>npm test</code>
             </div>
           </div>
         </div>
