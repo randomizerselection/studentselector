@@ -1,4 +1,4 @@
-:root {
+.selector-root {
   color-scheme: light;
   --bg: #f4efe6;
   --bg-alt: #e9f0ef;
@@ -31,11 +31,6 @@ body {
 
 body {
   margin: 0;
-  background:
-    linear-gradient(135deg, rgba(39, 123, 130, 0.08), transparent 36%),
-    linear-gradient(315deg, rgba(180, 111, 52, 0.10), transparent 38%),
-    var(--bg);
-  color: var(--text);
 }
 
 button,
@@ -57,6 +52,11 @@ button:disabled {
 .selector-root {
   min-height: 100vh;
   padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(39, 123, 130, 0.08), transparent 36%),
+    linear-gradient(315deg, rgba(180, 111, 52, 0.10), transparent 38%),
+    var(--bg);
+  color: var(--text);
 }
 
 .selector-shell {

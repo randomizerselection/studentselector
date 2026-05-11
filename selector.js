@@ -955,12 +955,12 @@
 
   function mount(container, options = {}) {
     if (!container) throw new Error("StudentSelector.mount requires a container element.");
-    ensureStylesheet(options.basePath);
+    if (!options.skipStyles) ensureStylesheet(options.basePath);
     return new StudentSelectorApp(container, options);
   }
 
   function open(options = {}) {
-    ensureStylesheet(options.basePath);
+    if (!options.skipStyles) ensureStylesheet(options.basePath);
     const host = document.createElement("div");
     host.className = "selector-overlay-host";
     document.body.appendChild(host);
