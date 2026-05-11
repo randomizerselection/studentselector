@@ -7,6 +7,8 @@ test("loads roster and completes the core selector flow", async ({ page }) => {
 
   const classSelect = page.locator("[data-action='class']");
   await expect(classSelect).toBeVisible();
+  await expect(classSelect.locator("option").first()).toHaveCSS("color", "rgb(7, 17, 31)");
+  await expect(classSelect.locator("option").first()).toHaveCSS("background-color", "rgb(255, 255, 255)");
   const options = await classSelect.locator("option").allTextContents();
   const className = options.find((option) => option !== "Select a Class");
   expect(className).toBeTruthy();
@@ -21,7 +23,11 @@ test("loads roster and completes the core selector flow", async ({ page }) => {
   await page.getByLabel("Close").click();
 
   await page.getByRole("button", { name: "Slot Effect" }).click();
-  await page.getByRole("button", { name: "START SELECTION" }).click();
+  const startButton = page.getByRole("button", { name: "START SELECTION" });
+  await startButton.hover();
+  await expect(startButton).toHaveCSS("color", "rgb(255, 250, 243)");
+  await expect(startButton).toHaveCSS("background-color", "rgb(133, 77, 34)");
+  await startButton.click();
 
   await expect(page.locator("[data-current-name]")).toHaveText("Get ready");
   await expect(page.getByRole("button", { name: /A\*|Excellent/ })).toBeVisible({ timeout: 7_000 });
