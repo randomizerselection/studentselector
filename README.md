@@ -1,10 +1,10 @@
 # Random Student Selector
 
-`Random Student Selector` is a Windows classroom app for running attendance-aware questioning, timed thinking, random student selection, quick formative outcomes, and live lesson summaries.
+`Random Student Selector` is a GitHub Pages-compatible classroom app for running attendance-aware questioning, timed thinking, random student selection, quick formative outcomes, and live lesson summaries.
 
 It was developed by Samuel Oehler-Huang at Suzhou Foreign Language School for practical Cambridge classroom use. The app is not intended to make questioning random for its own sake. It gives teachers a simple routine for involving more learners, making thinking time visible, collecting informal evidence, and reflecting on who may need follow-up.
 
-The app is built with Tkinter + `ttkbootstrap` and is optimized for Windows classroom setups, including high-DPI displays and multi-monitor use.
+The primary app now runs as static HTML, CSS, and JavaScript. The older Tkinter source is kept in the repository as the desktop implementation history.
 
 ## Screenshot
 
@@ -44,15 +44,16 @@ This routine is especially useful for cold calling, retrieval practice, checking
 
 - Select a class from a roster loaded from `assets/students.csv`.
 - Choose a built-in timer preset: `5 sec`, `30 sec`, `1 min`, or `2 min`.
-- Run a slot-style student selection window with an optional animated reel effect.
+- Run a slot-style student selection view with an optional animated reel effect.
 - Toggle `Sound` and `Slot Effect` from the main dock.
 - Play optional intro and closing audio cues from the main screen.
 - Take attendance before or during a session.
 - Mark each selected student as `A*`, `A`, `B`, `C`, `No Grade`, or `Absent`.
 - Remove absent students from the active class roster for the current session.
-- Keep chosen and absent students excluded while the app remains open.
+- Keep chosen and absent students excluded while the browser tab remains open.
 - Show a session summary with counts and per-student outcomes.
-- Resume an active session from the summary window.
+- Resume an active session from the summary view.
+- Open the selector from another lesson slide page with `window.StudentSelector.open()`.
 
 ## Typical classroom flow
 
@@ -113,7 +114,7 @@ The app expects these CSV files in `assets/`.
 
 ### `assets/students.csv`
 
-Required. This file is intentionally ignored by Git so each user can keep a local class list.
+Required. This file is published with the GitHub Pages site so the browser app can load the roster.
 
 Format:
 
@@ -155,7 +156,7 @@ Notes:
 
 Audio is optional.
 
-- If `pygame` is available and the asset files exist, the app can play:
+- If the browser allows audio after a user interaction and the asset files exist, the app can play:
   - intro music
   - closing music
   - slot-loop audio
@@ -165,30 +166,42 @@ Audio is optional.
 
 ## Running locally
 
-Install the Python dependencies first:
+The browser app has no build step. Serve the repository root with any static server:
 
 ```powershell
-pip install ttkbootstrap pygame
+python -m http.server 8766 --bind 127.0.0.1
 ```
 
-Then run:
+Then open:
 
-```powershell
-python studentselector.py
+```text
+http://127.0.0.1:8766/
 ```
 
-## Build an executable
+## Lesson slide integration
 
-The repo includes `studentselector.spec` for PyInstaller packaging.
+Load the selector files from the published selector folder, then open it as an overlay:
 
-Example:
-
-```powershell
-pip install pyinstaller
-pyinstaller --noconfirm studentselector.spec
+```html
+<link rel="stylesheet" href="/studentselector/selector.css">
+<script src="/studentselector/selector.js"></script>
+<button type="button" onclick="window.StudentSelector.open()">Open selector</button>
 ```
 
-The included `build.bat` also builds the app using `.venv\Scripts\python.exe`.
+You can also mount it inside a specific element:
+
+```html
+<div id="selector-panel"></div>
+<script>
+  window.StudentSelector.mount(document.getElementById("selector-panel"));
+</script>
+```
+
+State is stored in `sessionStorage`, so selected, absent, and graded students persist while the tab is open and reset in a new browser tab.
+
+## Desktop source
+
+The Python/Tkinter source files and PyInstaller spec remain in the repository for reference, but GitHub Pages uses `index.html`, `selector.css`, `selector.js`, and the files under `assets/`.
 
 ## Source framing
 

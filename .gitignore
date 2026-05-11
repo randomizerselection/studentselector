@@ -13,15 +13,18 @@ venv/
 ENV/
 env/
 
+# Node / browser tests
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+
 # VS Code settings (optional; many teams exclude)
 .vscode/
 
 # OS
 .DS_Store
 Thumbs.db
-
-# App data
-assets/students.csv
 
 Run (debug).bat
 build.bat
