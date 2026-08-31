@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "student-selector-session-v2";
-  const DEFAULT_AUDIO_VOLUME = 0.25;
+  const DEFAULT_AUDIO_VOLUME = 0.15;
   const DEFAULT_STATE = {
     selectedClass: "",
     timerSeconds: 5,

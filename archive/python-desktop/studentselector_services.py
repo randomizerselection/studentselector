@@ -3,7 +3,7 @@ import os
 import threading
 import time
 
-DEFAULT_AUDIO_VOLUME = 0.25
+DEFAULT_AUDIO_VOLUME = 0.15
 
 # -------------------------
 # Audio Manager (resilient)

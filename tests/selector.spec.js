@@ -20,7 +20,7 @@ test("starts muted and uses reduced audio volume", async ({ page }) => {
 
   await soundToggle.click();
   await page.getByRole("button", { name: "Play Intro" }).click();
-  await expect.poll(() => page.evaluate(() => window.__selectorAudioInstances[0]?.volume)).toBe(0.25);
+  await expect.poll(() => page.evaluate(() => window.__selectorAudioInstances[0]?.volume)).toBe(0.15);
 });
 
 test("loads roster and completes the core selector flow", async ({ page }) => {
