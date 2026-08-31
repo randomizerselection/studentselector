@@ -1,5 +1,28 @@
 const { expect, test } = require("@playwright/test");
 
+test("starts muted and uses reduced audio volume", async ({ page }) => {
+  await page.addInitScript(() => {
+    const NativeAudio = window.Audio;
+    window.__selectorAudioInstances = [];
+    window.Audio = function TrackedAudio(...args) {
+      const audio = new NativeAudio(...args);
+      window.__selectorAudioInstances.push(audio);
+      return audio;
+    };
+    window.Audio.prototype = NativeAudio.prototype;
+  });
+
+  await page.goto("/");
+
+  const soundToggle = page.getByRole("button", { name: "Sound" });
+  await expect(soundToggle).not.toHaveClass(/is-active/);
+  await expect(page.getByText("Muted", { exact: true })).toBeVisible();
+
+  await soundToggle.click();
+  await page.getByRole("button", { name: "Play Intro" }).click();
+  await expect.poll(() => page.evaluate(() => window.__selectorAudioInstances[0]?.volume)).toBe(0.25);
+});
+
 test("loads roster and completes the core selector flow", async ({ page }) => {
   await page.goto("/");
 

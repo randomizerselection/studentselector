@@ -59,7 +59,7 @@ class InvisibleHandApp(
         self.selected_class = ttk.StringVar(value="Select a Class")
         self.time_preset_var = tk.IntVar(value=5)
 
-        self.sound_enabled_var = tk.BooleanVar(value=True)
+        self.sound_enabled_var = tk.BooleanVar(value=False)
         self.sound.set_enabled(self.sound_enabled_var.get())
         self.slot_effect_enabled_var = tk.BooleanVar(value=True)
 

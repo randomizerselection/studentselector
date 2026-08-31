@@ -1,11 +1,12 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "student-selector-session-v1";
+  const STORAGE_KEY = "student-selector-session-v2";
+  const DEFAULT_AUDIO_VOLUME = 0.25;
   const DEFAULT_STATE = {
     selectedClass: "",
     timerSeconds: 5,
-    soundEnabled: true,
+    soundEnabled: false,
     slotEffectEnabled: true,
     selectedStudentsByClass: {},
     studentGradesByClass: {},
@@ -150,6 +151,7 @@
       if (!this.cache.has(url)) {
         const audio = new Audio(url);
         audio.preload = "auto";
+        audio.volume = DEFAULT_AUDIO_VOLUME;
         this.cache.set(url, audio);
       }
       return this.cache.get(url);

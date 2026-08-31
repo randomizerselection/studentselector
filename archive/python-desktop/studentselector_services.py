@@ -3,6 +3,8 @@ import os
 import threading
 import time
 
+DEFAULT_AUDIO_VOLUME = 0.25
+
 # -------------------------
 # Audio Manager (resilient)
 # -------------------------
@@ -14,16 +16,18 @@ class SoundManager:
     - sound channel: timeup (attempts pygame.mixer.Sound; falls back if needed)
     - self.enabled flag + set_enabled() to globally mute/unmute audio.
     """
-    def __init__(self):
+    def __init__(self, volume: float = DEFAULT_AUDIO_VOLUME):
         self._pygame = None
         self._mixer_ok = False
-        self.enabled = True
+        self.enabled = False
+        self.volume = max(0.0, min(1.0, float(volume)))
         self._winsound = None
 
         try:
             import pygame
             self._pygame = pygame
             pygame.mixer.init()
+            pygame.mixer.music.set_volume(self.volume)
             self._mixer_ok = True
         except Exception:
             self._pygame = None
@@ -41,6 +45,7 @@ class SoundManager:
         if not self.enabled and self._mixer_ok:
             try:
                 self._pygame.mixer.stop()
+                self._pygame.mixer.music.stop()
             except Exception:
                 pass
 
@@ -62,6 +67,7 @@ class SoundManager:
         try:
             self._pygame.mixer.music.stop()
             self._pygame.mixer.music.load(path)
+            self._pygame.mixer.music.set_volume(self.volume)
             self._pygame.mixer.music.play()
         except Exception:
             pass
@@ -73,6 +79,7 @@ class SoundManager:
         try:
             self._pygame.mixer.music.stop()
             self._pygame.mixer.music.load(path)
+            self._pygame.mixer.music.set_volume(self.volume)
             self._pygame.mixer.music.play(-1)
         except Exception:
             pass
@@ -83,11 +90,13 @@ class SoundManager:
             return
         try:
             snd = self._pygame.mixer.Sound(path)
+            snd.set_volume(self.volume)
             snd.play()
         except Exception:
             try:
                 self._pygame.mixer.music.stop()
                 self._pygame.mixer.music.load(path)
+                self._pygame.mixer.music.set_volume(self.volume)
                 self._pygame.mixer.music.play()
             except Exception:
                 pass

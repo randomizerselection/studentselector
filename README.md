@@ -15,6 +15,7 @@ The old Python/Tkinter desktop version is archived under `archive/python-desktop
 - Loads classes from `assets/students.csv`.
 - Loads feedback messages from `assets/messages.csv`.
 - Runs timer presets: `5 sec`, `30 sec`, `1 min`, and `2 min`.
+- Starts muted; when sound is enabled, audio cues play at 25% volume.
 - Supports sound and slot-effect toggles.
 - Runs attendance and excludes absent students for the current browser tab.
 - Randomly selects students from the remaining active roster.
