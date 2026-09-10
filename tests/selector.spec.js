@@ -62,6 +62,26 @@ test("loads roster and completes the core selector flow", async ({ page }) => {
   await expect(page.locator(".selector-summary-row")).toHaveCount(1);
 });
 
+test("loads the 2026-27 S3 Economics rosters", async ({ page }) => {
+  await page.goto("/");
+
+  const expectedRosters = [
+    { className: "S3.3", count: 38, firstStudent: "柏一鹏 Liam" },
+    { className: "S3.4", count: 40, firstStudent: "许睿宁 Ryan" },
+    { className: "S3.6", count: 33, firstStudent: "陈邢晔 Ron" }
+  ];
+
+  for (const { className, count, firstStudent } of expectedRosters) {
+    await page.locator("[data-action='class']").selectOption(className);
+    await expect(page.getByLabel("Selection stage").getByText(`${count} left | 0 graded`, { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Attendance" }).click();
+    await expect(page.getByRole("dialog", { name: "Roll call" })).toContainText(`Student 1 of ${count}`);
+    await expect(page.locator(".selector-rollcall-name")).toHaveText(firstStudent);
+    await page.getByLabel("Close").click();
+  }
+});
+
 test("exposes the reusable lesson overlay API", async ({ page }) => {
   await page.goto("/");
 
