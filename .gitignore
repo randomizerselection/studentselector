@@ -25,3 +25,8 @@ assets/students.csv
 
 Run (debug).bat
 build.bat
+
+# Keep all private roster CSV files out of Git.
+*.[cC][sS][vV]
+!assets/messages.csv
+private-rosters/
