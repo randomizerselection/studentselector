@@ -12,7 +12,7 @@ The old Python/Tkinter desktop version is archived under `archive/python-desktop
 
 ## What The Web App Does
 
-- Loads classes from `assets/students.csv`.
+- Loads a roster CSV chosen from your computer, entirely in the browser.
 - Loads feedback messages from `assets/messages.csv`.
 - Runs timer presets: `5 sec`, `30 sec`, `1 min`, and `2 min`.
 - Starts muted; when sound is enabled, audio cues play at 15% volume.
@@ -36,7 +36,6 @@ Session state is stored in `sessionStorage`, so it persists while the browser ta
 ├── landing.css                # About page styles
 ├── landing.js                 # About page behavior
 ├── assets/
-│   ├── students.csv           # Public roster file loaded by the browser
 │   ├── messages.csv           # Feedback messages
 │   ├── *.mp3                  # Optional classroom audio cues
 │   └── icon.png               # App icon
@@ -55,7 +54,7 @@ Most future changes should touch these files:
 - `index.html` for the standalone app shell.
 - `selector.css` for the selector UI.
 - `selector.js` for app behavior and the `window.StudentSelector` API.
-- `assets/students.csv` for roster data.
+- Private roster CSV files stay outside the repository and are selected in the app.
 - `assets/messages.csv` for feedback text.
 - `tests/selector.spec.js` for Playwright coverage.
 
@@ -63,23 +62,26 @@ Do not add new behavior to the archived Python app unless you are deliberately r
 
 ## Data Files
 
-### `assets/students.csv`
+### Private roster CSV
 
-Required. This file is published with the GitHub Pages site so the browser app can load the roster.
+Choose **Load roster CSV** in the app, then select your local CSV. The browser reads the file directly; the app does not upload it or request a roster from GitHub Pages.
 
 ```csv
 class,student
-IC 1.1,Anna Chen
-IC 1.1,Ben Carter
-IC 1.2,Jordan Lee
+Demo Class,Student One
+Demo Class,Student Two
+Demo Class,Student Three
 ```
-
-Rules:
 
 - Use two columns: `class` and `student`.
 - A header row is allowed and skipped automatically.
-- Duplicate student names inside the same class are de-duplicated while preserving order.
-- This file is public on GitHub Pages.
+- Duplicate names inside the same class are de-duplicated while preserving order.
+- Files must be 2 MB or less.
+- The roster and session state stay in this tab's `sessionStorage` when available, including after a page refresh. Close the tab when finished, especially on a shared computer. Browser session restoration may restore tab data.
+- Loading a different roster resets the attendance, selections, and grades for the session.
+- Keep real rosters outside this public repository. `.gitignore` excludes all CSV files except `assets/messages.csv`, plus the `private-rosters/` directory, but these rules can be bypassed by force-adding files or uploading them through GitHub's website.
+- Before pulling the commit that removes `assets/students.csv`, copy your local CSV outside the repository. A pull can remove a previously tracked local file.
+- Removing the current file does not erase previous commits, forks, or downloaded copies. History cleanup is a separate step.
 
 ### `assets/messages.csv`
 
@@ -174,3 +176,4 @@ The app is designed for structured classroom questioning:
 6. Use the pattern to adapt the next teaching move.
 
 It supports active learning, assessment for learning, inclusive participation, and teacher reflection. It does not replace lesson planning, teacher judgement, written work, or richer feedback.
+

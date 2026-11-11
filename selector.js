@@ -2,6 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "student-selector-session-v2";
+  const ROSTER_STORAGE_KEY = "student-selector-private-roster-v1";
   const DEFAULT_AUDIO_VOLUME = 0.15;
   const DEFAULT_STATE = {
     selectedClass: "",
@@ -192,6 +193,17 @@
       this.classes = {};
       this.messages = {};
       this.state = loadStoredState();
+      this.rosterText = "";
+      this.rosterLoading = false;
+      this.rosterStorageNotice = "";
+      this.destroyed = false;
+      try {
+        this.rosterText = window.sessionStorage.getItem(ROSTER_STORAGE_KEY) || "";
+        this.classes = this.parseStudents(this.rosterText);
+      } catch (_error) {
+        // File import still works when browser storage is unavailable.
+      }
+      if (!this.classes[this.state.selectedClass]) this.state.selectedClass = "";
       this.stage = { mode: "idle" };
       this.modal = null;
       this.timers = new Set();
@@ -203,6 +215,7 @@
     }
 
     destroy() {
+      this.destroyed = true;
       this.clearTimers();
       this.sound.stop();
       document.removeEventListener("keydown", this.boundKeydown);
@@ -243,40 +256,83 @@
         studentUngradedByClass: this.state.studentUngradedByClass,
         absentStudentsByClass: this.state.absentStudentsByClass
       };
-      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      try {
+        window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      } catch (_error) {
+        // Do not restore stale grades if a later save runs out of space.
+        try { window.sessionStorage.removeItem(STORAGE_KEY); } catch (_storageError) {}
+      }
     }
 
     async loadData() {
       try {
-        const [studentText, messageText] = await Promise.all([
-          fetch(assetUrl("assets/students.csv", this.basePath)).then((response) => {
-            if (!response.ok) throw new Error("Missing students.csv");
-            return response.text();
-          }),
-          fetch(assetUrl("assets/messages.csv", this.basePath)).then((response) => {
-            if (!response.ok) throw new Error("Missing messages.csv");
-            return response.text();
-          })
-        ]);
-        this.classes = this.parseStudents(studentText);
+        const response = await fetch(assetUrl("assets/messages.csv", this.basePath));
+        if (!response.ok) throw new Error("Missing messages.csv");
+        const messageText = await response.text();
+        if (this.destroyed) return;
         this.messages = this.parseMessages(messageText);
-        if (this.state.selectedClass && !this.classes[this.state.selectedClass]) {
-          this.state.selectedClass = "";
-          this.save();
+        this.render();
+      } catch (_error) {
+        if (this.destroyed) return;
+        // Grading can use its built-in fallback if feedback text is unavailable.
+        this.messages = {};
+        this.render();
+      }
+    }
+
+    async importRoster(file) {
+      if (!file || this.rosterLoading) return;
+      this.rosterLoading = true;
+      this.render();
+      try {
+        if (file.size > 2 * 1024 * 1024) throw new Error("Choose a CSV of 2 MB or less.");
+        const text = await file.text();
+        if (this.destroyed) return;
+        const classes = this.parseStudents(text);
+        if (!Object.keys(classes).length) {
+          throw new Error("Use a CSV with class and student columns and at least one student.");
         }
-        this.render();
+        this.clearTimers();
+        this.sound.stop();
+        if (text !== this.rosterText) {
+          this.state.selectedClass = "";
+          this.state.selectedStudentsByClass = {};
+          this.state.studentGradesByClass = {};
+          this.state.studentUngradedByClass = {};
+          this.state.absentStudentsByClass = {};
+        }
+        this.rosterText = text;
+        this.classes = classes;
+        this.stage = { mode: "idle" };
+        this.modal = null;
+        this.rosterStorageNotice = "";
+        try {
+          window.sessionStorage.setItem(ROSTER_STORAGE_KEY, text);
+          this.save();
+        } catch (_error) {
+          let cleared = false;
+          try {
+            window.sessionStorage.removeItem(ROSTER_STORAGE_KEY);
+            window.sessionStorage.removeItem(STORAGE_KEY);
+            cleared = true;
+          } catch (_storageError) {
+            // Some browsers disable all storage operations.
+          }
+          this.rosterStorageNotice = cleared
+            ? "This roster is available only until you refresh or close this page. Choose the CSV again after a refresh."
+            : "Browser storage is unavailable. Reloading may restore an older session; choose this CSV again after a refresh.";
+        }
       } catch (error) {
-        this.stage = {
-          mode: "error",
-          message: error.message || "Unable to load selector data."
-        };
-        this.render();
+        if (!this.destroyed) this.showMessage("Unable to load roster", error.message || "Choose a valid CSV.");
+      } finally {
+        this.rosterLoading = false;
+        if (!this.destroyed) this.render();
       }
     }
 
     parseStudents(text) {
       const rows = parseCsv(text);
-      const classes = {};
+      const classes = Object.create(null);
       rows.forEach((row, index) => {
         if (row.length < 2) return;
         const first = row[0].trim();
@@ -657,6 +713,13 @@
           </div>
 
           <label class="selector-section">
+            <span class="selector-section-label">Load roster CSV</span>
+            <input type="file" accept=".csv,text/csv" data-roster-file aria-label="Load roster CSV" ${this.rosterLoading ? "disabled" : ""}>
+            <span class="selector-help">${this.rosterLoading ? "Reading roster..." : "Read only in this browser tab. Nothing is uploaded. A different roster starts a new session."}</span>
+            ${this.rosterStorageNotice ? `<span class="selector-help" role="status">${escapeHtml(this.rosterStorageNotice)}</span>` : ""}
+          </label>
+
+          <label class="selector-section">
             <span class="selector-section-label">Class</span>
             <select class="selector-class-select" data-action="class">
               <option value="">Select a Class</option>
@@ -932,6 +995,10 @@
       if (select) {
         select.addEventListener("change", (event) => this.setClass(event.currentTarget.value));
       }
+      const rosterInput = this.container.querySelector("[data-roster-file]");
+      if (rosterInput) {
+        rosterInput.addEventListener("change", (event) => this.importRoster(event.currentTarget.files[0]));
+      }
     }
   }
 
@@ -981,3 +1048,4 @@
     open
   };
 })();
+

@@ -85,9 +85,9 @@ This is the recommended pattern for the IGCSE lesson slide viewer because it pre
 
 The selector loads these files relative to `basePath`:
 
-- `assets/students.csv`
 - `assets/messages.csv`
 - `assets/icon.png`
 - optional audio files in `assets/`
 
-Selection state is stored in `sessionStorage`, scoped to the browser tab.
+Choose **Load roster CSV** inside the selector to read a local roster. No roster is fetched from the site or uploaded by the selector. Roster and selection state are stored in `sessionStorage`, scoped to the browser tab and the host page's origin. Only embed the selector in trusted pages, since scripts on the host page can access its data. Close the tab when finished on a shared computer. Browser session restoration may restore tab data.
+

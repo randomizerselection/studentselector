@@ -27,5 +27,11 @@ blob-report/
 .DS_Store
 Thumbs.db
 
+# Private classroom rosters: load from your computer, never publish them.
+*.[cC][sS][vV]
+!assets/messages.csv
+private-rosters/
+
 Run (debug).bat
 build.bat
+
